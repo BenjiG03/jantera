@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jantera"
+version = "0.2.0"
+description = "A differentiable, GPU-resident chemical kinetics library using JAX"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "jax>=0.4.0",
+    "jaxlib>=0.4.0",
+    "equinox>=0.11.0",
+    "diffrax>=0.5.0",
+    "optimistix>=0.0.6",
+    "cantera>=3.0.0",
+    "pyyaml",
+    "numpy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

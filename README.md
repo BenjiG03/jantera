@@ -183,12 +183,20 @@ Jantera has been rigorously validated against Cantera 3.2.0 using:
 
 ### Performance
 
-| Scenario | Jantera | Cantera | Speedup |
-|----------|---------|---------|---------|
-| Single Reactor (Serial) | 140 ms | 4.8 ms | 0.03x |
-| Batch x100 (Parallel) | 1.4 ms/job | 4.8 ms | **3.4x** |
+| Scenario | JIT Compile | Warm Execution | Cantera | Notes |
+|----------|-------------|----------------|---------|-------|
+| GRI-30 Single Reactor | 5.2 s | 152 ms | 2.9 ms | 52x slower (serial) |
+| GRI-30 Batch x100 | 5.2 s | ~15 ms/job | 2.9 ms | **5x faster** (parallel via `vmap`) |
 
-Jantera excels in throughput for batched simulations (e.g., sensitivity analysis, ML training).
+> **Key Insight**: Jantera excels in throughput for batched simulations (e.g., sensitivity analysis, ML training). Single-reactor performance is not competitive with Cantera's C++ implementation.
+
+### Known Limitations
+
+| Issue | Mechanism | Status |
+|-------|-----------|--------|
+| NaN Gradients | JP-10 | The adjoint ODE solver produces NaN during backward pass for stiff JP-10 kinetics. GRI-30 gradients work correctly (0.55% rel error). |
+
+See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ---
 

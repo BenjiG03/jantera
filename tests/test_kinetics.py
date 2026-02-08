@@ -30,13 +30,13 @@ def test_kinetics():
         sol.TPX = T, P, 'CH4:1.0, O2:2.0, N2:7.52'
         
         # Cantera (kmol-based)
-        wdot_cantera = sol.net_production_rates * 1000.0 # kmol -> mol
+        wdot_cantera = sol.net_production_rates 
         kf_cantera_raw = sol.forward_rate_constants
         kc_cantera_raw = sol.equilibrium_constants
         
-        # Jantera (mol-based)
+        # Jantera (kmol-based)
         Y = jnp.array(sol.Y)
-        conc = jnp.array(sol.density * sol.Y / (sol.molecular_weights / 1000.0))
+        conc = jnp.array(sol.concentrations)
         
         from jantera.kinetics import compute_kf, compute_Kc
         kf_jantera = compute_kf(T, conc, mech)
@@ -46,22 +46,8 @@ def test_kinetics():
         for j in range(3):
             rxn = sol.reaction(j)
             print(f"Rxn {j}: {rxn}")
-            # Scaling for comparison
-            stoich_order = sum(rxn.reactants.values())
-            if hasattr(rxn, 'reaction_type') and 'three-body' in rxn.reaction_type:
-                n_eff = stoich_order + 1
-            else:
-                n_eff = stoich_order
-            
-            # k_jan = k_can * 1000^(1-n_eff)
-            kf_can_scaled = kf_cantera_raw[j] * (1000.0**(1.0 - n_eff))
-            
-            dnu = sum(rxn.products.values()) - sum(rxn.reactants.values())
-            # Kc_jan = Kc_can * 1000^(-dnu)
-            kc_can_scaled = kc_cantera_raw[j] * (1000.0**(-dnu))
-            
-            print(f"  kf: Cantera(scaled)={kf_can_scaled:.3e}, Jantera={kf_jantera[j]:.3e}")
-            print(f"  Kc: Cantera(scaled)={kc_can_scaled:.3e}, Jantera={kc_jantera[j]:.3e}")
+            print(f"  kf: Cantera={kf_cantera_raw[j]:.3e}, Jantera={kf_jantera[j]:.3e}")
+            print(f"  Kc: Cantera={kc_cantera_raw[j]:.3e}, Jantera={kc_jantera[j]:.3e}")
         
         wdot_jantera, _, _, _ = compute_wdot(T, P, Y, mech)
         wdot_jantera = np.array(wdot_jantera)
@@ -84,7 +70,7 @@ def test_kinetics():
         plt.bar(np.arange(mech.n_species), wdot_jantera, alpha=0.5, label='Jantera')
         plt.title(f"Net Production Rates at {T}K")
         plt.xlabel("Species Index")
-        plt.ylabel("wdot [mol/m3/s]")
+        plt.ylabel("wdot [kmol/m3/s]")
         plt.legend()
         plt.yscale('symlog', linthresh=1e-10)
         plt.savefig(f"tests/outputs/kinetics_T{T}.png")

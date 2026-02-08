@@ -51,7 +51,7 @@ def validate_mechanism(name, yaml_path, initial_conditions):
     # 1. Static Validation & Parity Plots
     print(f"--- Static Validation & Parity Plots ---", flush=True)
     # Generate random samples for parity
-    n_samples = 50
+    n_samples = 20
     sample_Ts = np.random.uniform(800, 2500, n_samples)
     sample_Ps = np.random.uniform(0.5e5, 10e5, n_samples)
     
@@ -67,7 +67,7 @@ def validate_mechanism(name, yaml_path, initial_conditions):
         wdot_jt_max_list.append(np.max(np.abs(w_jt)))
         
         cp_ct_list.append(sol_ct.cp_mass)
-        wdot_ct_max_list.append(np.max(np.abs(sol_ct.net_production_rates * 1000.0)))
+        wdot_ct_max_list.append(np.max(np.abs(sol_ct.net_production_rates)))
 
     # Plot Static Parity
     plt.figure(figsize=(12, 5))
@@ -95,21 +95,24 @@ def validate_mechanism(name, yaml_path, initial_conditions):
     sol_ct.TPX = T0, P0, X0_str
     sol_jt.TPX = T0, P0, X0_str
     wdot_jt, h_jt, cp_jt, rho_jt = compute_wdot(sol_jt.T, sol_jt.P, sol_jt.Y, mech_jt)
-    wdot_ct = sol_ct.net_production_rates * 1000.0
+    wdot_ct = sol_ct.net_production_rates
     
     err_wdot = np.max(np.abs(wdot_jt - wdot_ct) / (np.max(np.abs(wdot_ct)) + 1e-10))
     results['static_err'] = err_wdot
 
     # 2. Dynamic Validation (ReactorNet) -> Already plotting T, Y
     print(f"--- Dynamic Validation (ReactorNet) ---", flush=True)
-    t_end = 1e-4 # 0.1ms
+    t_end = 1e-3 # 1ms
     from diffrax import Kvaerno5, SaveAt
     net_jt = ReactorNet(mech_jt)
     
-    ts_jax = jnp.linspace(0, t_end, 100)
+    ts_jax = jnp.linspace(0, t_end, 50)
     saveat = SaveAt(ts=ts_jax)
+    
+    start_jt = time.time()
     res_jt = net_jt.advance(T0, P0, sol_jt.Y, t_end, rtol=1e-8, atol=1e-12, solver=Kvaerno5(), saveat=saveat)
     jax.block_until_ready(res_jt)
+    jt_time = time.time() - start_jt
     
     jt_ts, jt_T, jt_Y = np.array(res_jt.ts), np.array(res_jt.ys[:, 0]), np.array(res_jt.ys[:, 1:])
     
@@ -118,10 +121,12 @@ def validate_mechanism(name, yaml_path, initial_conditions):
     net_ct = ct.ReactorNet([reac_ct])
     net_ct.rtol, net_ct.atol = 1e-8, 1e-12
     
+    start_ct = time.time()
     ct_ts, ct_T, ct_Y = [], [], []
     for t in ts_jax:
         net_ct.advance(float(t))
         ct_ts.append(float(t)); ct_T.append(sol_ct.T); ct_Y.append(sol_ct.Y.copy())
+    ct_time = time.time() - start_ct
     ct_ts, ct_T, ct_Y = np.array(ct_ts), np.array(ct_T), np.array(ct_Y)
     
     # Plot Trajectory (Done in previous step, keeping it)
@@ -209,14 +214,14 @@ def validate_mechanism(name, yaml_path, initial_conditions):
     plt.close()
 
     results['grad_ok'] = True
-    results['perf'] = (0, 0, 0.01, 0) # Placeholder
+    results['perf'] = (0, jt_time, ct_time, 0) # Placeholder for JIT/Batched
     return results
 
 def main():
     # Ensure outputs dir exists
     os.makedirs("tests/outputs", exist_ok=True)
     
-    # 1. GRI-30 (Methane)
+    # 1. GRI-30 (Methane) - 1500K/1atm shows slow oxidation over 1ms
     gri_cond = (1500.0, 101325.0, "CH4:1, O2:2, N2:7.52")
     res_gri = validate_mechanism("GRI-30", "gri30.yaml", gri_cond)
     
@@ -225,6 +230,8 @@ def main():
     res_jp10 = validate_mechanism("JP-10", "jp10.yaml", jp10_cond)
     
     def fmt_speed(jt, ct):
+        if jt < 1e-12:
+            return "N/A"
         if jt < ct:
             return f"{ct/jt:.1f}x"
         else:

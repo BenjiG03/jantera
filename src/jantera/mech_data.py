@@ -40,6 +40,9 @@ class MechData(eqx.Module):
     is_three_body: jax.Array        # (n_reactions,) bool
     efficiencies: jax.Array         # (n_reactions, n_species)
     
+    # Reversibility
+    is_reversible: jax.Array        # (n_reactions,) bool
+    
     # Falloff data
     is_falloff: jax.Array           # (n_reactions,) bool
     A_low: jax.Array                # (n_reactions,)

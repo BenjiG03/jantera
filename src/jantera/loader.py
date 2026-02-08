@@ -19,8 +19,8 @@ def load_mechanism(yaml_file: str) -> MechData:
     
     # 1. Species Data
     species_names = tuple(sol.species_names)
-    # MW: kg/kmol -> kg/mol
-    mol_weights = jnp.array(sol.molecular_weights) / 1000.0
+    # MW: kg/kmol
+    mol_weights = jnp.array(sol.molecular_weights)
     
     # Element Data
     element_names = tuple(sol.element_names)
@@ -60,6 +60,7 @@ def load_mechanism(yaml_file: str) -> MechData:
     
     is_three_body = np.zeros(n_reactions, dtype=bool)
     efficiencies = np.ones((n_reactions, n_species))
+    is_reversible = np.zeros(n_reactions, dtype=bool)
     
     is_falloff = np.zeros(n_reactions, dtype=bool)
     A_low = np.zeros(n_reactions)
@@ -70,6 +71,7 @@ def load_mechanism(yaml_file: str) -> MechData:
     has_troe = np.zeros(n_reactions, dtype=bool)
     
     for i, rxn in enumerate(sol.reactions()):
+        is_reversible[i] = rxn.reversible
         # Stoichiometry
         for sp, coeff in rxn.reactants.items():
             reactant_stoich[i, sol.species_index(sp)] = coeff
@@ -85,6 +87,10 @@ def load_mechanism(yaml_file: str) -> MechData:
         if 'three-body' in r_type:
             is_three_body[i] = True
             if rxn.third_body:
+                # Get the default efficiency for this reaction (0.0 for "explicit" third bodies)
+                default_eff = rxn.third_body.default_efficiency
+                efficiencies[i, :] = default_eff  # Set all to default first
+                
                 eff_map = rxn.third_body.efficiencies
                 for sp_name, eff in eff_map.items():
                     efficiencies[i, sol.species_index(sp_name)] = eff
@@ -92,31 +98,35 @@ def load_mechanism(yaml_file: str) -> MechData:
             # Unit conversion: A is m^3/(kmol*s) for 2 reactants + 1 third body
             # effective order = stoich_order + 1
             n_eff = stoich_order + 1
-            A[i] = rate.pre_exponential_factor * (1000.0**(1.0 - n_eff))
+            A[i] = rate.pre_exponential_factor
             b[i] = rate.temperature_exponent
-            Ea[i] = rate.activation_energy / 1000.0 # J/kmol -> J/mol
+            Ea[i] = rate.activation_energy
             
         elif 'falloff' in r_type:
             is_falloff[i] = True
             is_three_body[i] = True # Falloff is implicitly a 3-body collision
             
             if rxn.third_body:
+                # Get the default efficiency for this reaction
+                default_eff = rxn.third_body.default_efficiency
+                efficiencies[i, :] = default_eff  # Set all to default first
+                
                 eff_map = rxn.third_body.efficiencies
                 for sp_name, eff in eff_map.items():
                     efficiencies[i, sol.species_index(sp_name)] = eff
             
             # High-pressure limit
             # effective order = stoich_order
-            A[i] = rate.high_rate.pre_exponential_factor * (1000.0**(1.0 - stoich_order))
+            A[i] = rate.high_rate.pre_exponential_factor
             b[i] = rate.high_rate.temperature_exponent
-            Ea[i] = rate.high_rate.activation_energy / 1000.0
+            Ea[i] = rate.high_rate.activation_energy
             
             # Low-pressure limit
             # effective order = stoich_order + 1
             n_eff_low = stoich_order + 1
-            A_low[i] = rate.low_rate.pre_exponential_factor * (1000.0**(1.0 - n_eff_low))
+            A_low[i] = rate.low_rate.pre_exponential_factor
             b_low[i] = rate.low_rate.temperature_exponent
-            Ea_low[i] = rate.low_rate.activation_energy / 1000.0
+            Ea_low[i] = rate.low_rate.activation_energy
             
             if hasattr(rate, 'falloff_coeffs') and len(rate.falloff_coeffs) > 0:
                 has_troe[i] = True
@@ -132,9 +142,9 @@ def load_mechanism(yaml_file: str) -> MechData:
                 troe_params[i] = [1.0, 1e30, 1e30, 1e30]
                 
         else: # Elementary reaction
-            A[i] = rate.pre_exponential_factor * (1000.0**(1.0 - stoich_order))
+            A[i] = rate.pre_exponential_factor
             b[i] = rate.temperature_exponent
-            Ea[i] = rate.activation_energy / 1000.0
+            Ea[i] = rate.activation_energy
             
     net_stoich = product_stoich - reactant_stoich
     
@@ -159,6 +169,7 @@ def load_mechanism(yaml_file: str) -> MechData:
         Ea=jnp.array(Ea),
         is_three_body=jnp.array(is_three_body),
         efficiencies=jnp.array(efficiencies),
+        is_reversible=jnp.array(is_reversible),
         is_falloff=jnp.array(is_falloff),
         A_low=jnp.array(A_low),
         b_low=jnp.array(b_low),

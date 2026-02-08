@@ -18,7 +18,8 @@ def compute_kf(T, conc, mech):
     
     # 2. Three-body Enhancement
     # [M]_j = sum_i (eff_ji * conc_i)
-    m_eff = jnp.dot(mech.efficiencies, conc)
+    # Clip concentration to 0 for m_eff
+    m_eff = jnp.dot(mech.efficiencies, jnp.maximum(conc, 0.0))
     # Applied to three-body and falloff reactions
     kf = jnp.where(mech.is_three_body, kf * m_eff, kf)
     
@@ -46,21 +47,26 @@ def compute_kf(T, conc, mech):
     T1 = mech.troe_params[:, 2]
     T2 = mech.troe_params[:, 3]
     
-    f_cent = (1.0 - alpha) * jnp.exp(-T / jnp.maximum(T3, 1e-5)) + alpha * jnp.exp(-T / jnp.maximum(T1, 1e-5)) + jnp.exp(-T2 / jnp.maximum(T, 1e-5))
-    f_cent = jnp.maximum(f_cent, 1e-20)
+    # Mask inputs to avoid nan in non-falloff reactions
+    safe_Pr = jnp.where(mech.is_falloff, Pr, 1.0)
     
-    log10_Pr = jnp.log10(Pr)
-    log10_Fcent = jnp.log10(f_cent)
+    f_cent = (1.0 - alpha) * jnp.exp(-T / jnp.maximum(T3, 1e-5)) + alpha * jnp.exp(-T / jnp.maximum(T1, 1e-5)) + jnp.exp(-T2 / jnp.maximum(T, 1e-5))
+    safe_f_cent = jnp.where(mech.is_falloff, f_cent, 1.0)
+    
+    log10_Pr = jnp.log10(safe_Pr + 1e-100)
+    log10_Fcent = jnp.log10(safe_f_cent + 1e-100)
     C = -0.4 - 0.67 * log10_Fcent
     N = 0.75 - 1.27 * log10_Fcent
     
     denom = N - 0.14 * (log10_Pr + C)
-    f_exponent = 1.0 / (1.0 + ((log10_Pr + C) / jnp.where(jnp.abs(denom) > 1e-5, denom, 1e-5))**2)
+    # Avoid division by zero in exponent
+    safe_denom = jnp.where(jnp.abs(denom) > 1e-10, denom, 1e-10)
+    f_exponent = 1.0 / (1.0 + ((log10_Pr + C) / safe_denom)**2)
     F = jnp.power(10.0, log10_Fcent * f_exponent)
     
     # If not Troe (Lindemann), F = 1.0 (handled by troe_params being zero or default)
     
-    kf_falloff = k_inf * (Pr / (1.0 + Pr)) * F
+    kf_falloff = k_inf * (safe_Pr / (1.0 + safe_Pr)) * F
     
     # Update kf for falloff reactions
     kf = jnp.where(mech.is_falloff, kf_falloff, kf)
@@ -103,9 +109,7 @@ def compute_wdot(T, P, Y, mech):
     
     # 2. Concentrations [mol/m^3]
     # [C]_i = rho * Y_i / MW_i
-    Y_eff = jnp.maximum(Y, 1e-20)
-    conc = jnp.maximum(rho, 1e-10) * Y_eff / mech.mol_weights
-    conc = jnp.maximum(conc, 1e-20)
+    conc = rho * Y / mech.mol_weights
     
     # 3. Forward and reverse rate constants
     kf = compute_kf(T, conc, mech)
@@ -115,9 +119,17 @@ def compute_wdot(T, P, Y, mech):
     # 4. Rates of progress for each reaction
     # q = kf * prod(conc^nu_reac) - kr * prod(conc^nu_prod)
     
-    # Use jnp.power for better AD stability than exp(dot(stoich, log(conc)))
-    f_rop = kf * jnp.prod(jnp.power(conc, mech.reactant_stoich), axis=1)
-    r_rop = kr * jnp.prod(jnp.power(conc, mech.product_stoich), axis=1)
+    # conc can become slightly negative during integration; clip for stability
+    # Use 1e-30 as floor to avoid nan gradients with fractional stoich
+    safe_conc = jnp.maximum(conc, 1e-30)
+    
+    # Use jnp.prod(jnp.power) with a safe mask to avoid 0^0 in gradients.
+    # We use jnp.where to only apply power to species with non-zero stoichiometry.
+    f_rop = kf * jnp.prod(jnp.power(jnp.where(mech.reactant_stoich > 0, safe_conc, 1.0), mech.reactant_stoich), axis=1)
+    r_rop = kr * jnp.prod(jnp.power(jnp.where(mech.product_stoich > 0, safe_conc, 1.0), mech.product_stoich), axis=1)
+    
+    # Mask reverse rates for irreversible reactions
+    r_rop = jnp.where(mech.is_reversible, r_rop, 0.0)
     
     rop = f_rop - r_rop
     

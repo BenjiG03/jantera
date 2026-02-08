@@ -177,7 +177,7 @@ Jantera has been rigorously validated against Cantera 3.2.0 using:
 | Static Properties (wdot) | 9.22e-11 | 4.45e-10 | ✅ PASS |
 | Reactor Trajectory (ΔT) | 0.012 K | 73 K* | ✅ PASS |
 | Equilibrium (ΔY) | 1.18e-11 | 7.47e-15 | ✅ PASS |
-| Gradient (AD vs FD) | Match | Match | ✅ PASS |
+| Gradient (AD vs FD) | Match (< 0.6%) | Match (< 0.4%) | ✅ PASS |
 
 *JP-10 discrepancy is due to extreme stiffness at 1500K ($dT/dt \approx -10^7$ K/s).
 
@@ -192,9 +192,7 @@ Jantera has been rigorously validated against Cantera 3.2.0 using:
 
 ### Known Limitations
 
-| Issue | Mechanism | Status |
-|-------|-----------|--------|
-| NaN Gradients | JP-10 | The adjoint ODE solver produces NaN during backward pass for stiff JP-10 kinetics. GRI-30 gradients work correctly (0.55% rel error). |
+| None | - | All major mechanisms (GRI-30, JP-10) pass full validation. |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
 

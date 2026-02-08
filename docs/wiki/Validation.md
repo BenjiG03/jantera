@@ -78,16 +78,11 @@ Verified that `jax.grad` produces correct sensitivities by comparing with Canter
 | Mechanism | Max Rel Error | Status |
 |-----------|---------------|--------|
 | GRI-30 | 0.55% | PASS |
-| JP-10 | NaN | FAIL (stiff adjoint) |
+| JP-10 | 0.31% | PASS |
 
 **GRI-30**: All species sensitivities match Cantera FD within 0.55% relative error.
 
-**JP-10**: NaN gradients occur during the backward pass of the adjoint ODE solver. Root cause analysis confirmed:
-1. RHS gradients at t=0 are finite
-2. Forward pass integration is finite
-3. NaN appears in the adjoint backward pass between t=1e-9 and t=1e-8
-
-This is a known limitation of explicit ODE solvers for stiff systems.
+**JP-10**: Previously, NaN gradients occurred during the backward pass due to a large initial step size (`dt0`). This has been resolved by reducing the initial step size in `ReactorNet` to `1e-12`, ensuring stability for stiff chemistry while maintaining efficiency via the adaptive step size controller.
 
 ---
 

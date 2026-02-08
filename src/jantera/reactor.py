@@ -66,7 +66,7 @@ class ReactorNet(eqx.Module):
             solver,
             t0=0.0,
             t1=t_end,
-            dt0=1e-8,
+            dt0=1e-12,
             y0=state0,
             args=(P, self.mech),
             stepsize_controller=stepsize_controller,

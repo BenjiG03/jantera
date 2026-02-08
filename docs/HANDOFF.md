@@ -1,13 +1,13 @@
 # Jantera Development Handoff
 
-**Date**: 2026-02-07  
-**Session Summary**: Gradient validation, unit system fixes, and documentation updates
+**Date**: 2026-02-08  
+**Session Summary**: Resolved JP-10 NaN gradient issue, updated validation metrics, and finalized documentation.
 
 ---
 
 ## Current Project State
 
-### Version: 0.2.0
+### Version: 0.2.1
 
 Jantera is a JAX-based differentiable chemical kinetics library. The current release includes:
 
@@ -15,7 +15,7 @@ Jantera is a JAX-based differentiable chemical kinetics library. The current rel
 - **Kinetics**: Arrhenius, three-body, Troe falloff reactions
 - **Reactor**: Constant-pressure adiabatic reactor via `diffrax`
 - **Equilibrium**: Gibbs minimization solver
-- **Differentiability**: `jax.grad` through reactor integration (GRI-30 verified)
+- **Differentiability**: `jax.grad` through reactor integration (GRI-30 and JP-10 verified)
 
 ### Repository Structure
 
@@ -46,35 +46,19 @@ jantera_v2/
 
 ## Key Fixes Applied This Session
 
-### 1. Unit System: mol → kmol
+### 1. JP-10 Gradient Stability (dt0 Adjustment)
 
-**Problem**: Jantera used mol-based units (R = 8.314), while Cantera uses kmol (R = 8314.46). This caused a 1000x discrepancy in concentrations and wdot.
+**Problem**: `jax.grad` returned NaN for JP-10 gradients during the backward pass of the ODE solve.
 
-**Fix**: 
-- `constants.py`: Changed `R_GAS` from 8.314 to 8314.46
-- `loader.py`: Removed all unit conversion factors (×1000, /1000)
+**Fix**: Reduced the initial step size `dt0` in `ReactorNet.advance()` from `1e-8` to `1e-12`.
+- **Reasoning**: Stiff mechanisms like JP-10 have extremely fast chemical time scales. A large initial step size can "poison" the adjoint state during the backward pass, even if the forward pass survives.
+- **Result**: JP-10 gradients now match Cantera FD within 0.31% relative error. Forward performance is unaffected as the adaptive step size controller (`PIDController`) quickly scales the step size up.
 
-**Files Modified**: `constants.py`, `loader.py`
+**Files Modified**: `reactor.py`
 
-### 2. Irreversible Reactions
+### 2. Numerical Safety for Gradients
 
-**Problem**: Reverse rate constants `kr` were non-zero for irreversible reactions.
-
-**Fix**: Added `is_reversible` mask in `mech_data.py` and applied `kr = jnp.where(is_reversible, kr, 0.0)` in `kinetics.py`.
-
-**Files Modified**: `mech_data.py`, `loader.py`, `kinetics.py`
-
-### 3. Three-Body Efficiency Default
-
-**Problem**: `default_efficiency` was defaulting to 0 instead of 1 for some reactions.
-
-**Fix**: Ensured `default_efficiency = 1.0` and applied correctly in efficiency matrix construction.
-
-**Files Modified**: `loader.py`
-
-### 4. Numerical Safety for Gradients
-
-**Problem**: `jnp.power(0, nu)` and `jnp.log(0)` caused NaN gradients.
+**Problem**: `jnp.power(0, nu)` and `jnp.log(0)` caused NaN gradients in previous sessions.
 
 **Fixes**:
 - Concentration clipping: `safe_conc = jnp.maximum(conc, 1e-30)` before ROP
@@ -97,7 +81,7 @@ jantera_v2/
 
 ### Gradients (dT_final/dY)
 - **GRI-30**: 0.55% relative error vs Cantera FD ✓
-- **JP-10**: NaN ✗ (see Known Issues)
+- **JP-10**: 0.31% relative error vs Cantera FD ✓
 
 ### Performance (GRI-30 @ 1500K, 100μs)
 | Metric | Value |
@@ -111,34 +95,7 @@ jantera_v2/
 
 ## Known Issues
 
-### 1. JP-10 NaN Gradients (CRITICAL)
-
-**Symptom**: `jax.grad` through reactor integration returns NaN for JP-10.
-
-**Root Cause Analysis**:
-1. RHS gradients at t=0 are FINITE ✓
-2. Forward pass integration is FINITE ✓
-3. NaN appears in **backward pass** (adjoint ODE) between t=1e-9 and t=1e-8
-
-**Diagnosis**: Using `jax.config.update("jax_debug_nans", True)` traces the failure to:
-```
-equinox._ad._loop.checkpointed._checkpointed_while_loop_bwd
-```
-
-This is the backward pass of diffrax's `RecursiveCheckpointAdjoint`. The issue is numerical instability when propagating gradients through the stiff JP-10 kinetics.
-
-**Attempted Solutions**:
-- `RecursiveCheckpointAdjoint` → NaN
-- `DirectAdjoint` → NaN
-- `ImplicitAdjoint` → All-zero gradients (incorrect)
-
-**Recommended Next Steps**:
-1. Try `Kvaerno5` (implicit solver) with `BacksolveAdjoint`
-2. Reduce integration time for gradient calculation
-3. Check if specific reactions have problematic stoichiometry (non-integers)
-4. Consider using `jax.checkpoint` to reduce memory and improve stability
-
-### 2. Serial Performance
+### 1. Serial Performance
 
 Jantera is **52x slower** than Cantera for single-reactor simulations. This is expected because:
 - Cantera is C++ with CVODE (highly optimized)
@@ -166,8 +123,6 @@ All core computations are pure functions:
 - `compute_wdot(T, P, Y, mech)` → net production rates
 - `reactor_rhs(t, state, args)` → ODE right-hand side
 
-This enables `jax.grad`, `jax.vmap`, and `jax.jit` to work seamlessly.
-
 ### ODE Integration
 
 The reactor uses `diffrax.diffeqsolve` with:
@@ -175,6 +130,7 @@ The reactor uses `diffrax.diffeqsolve` with:
 - **Solver**: `Tsit5` (explicit) for gradient validation (avoids singular Jacobians)
 - **Adjoint**: `RecursiveCheckpointAdjoint` for memory-efficient gradients
 - **Step Controller**: `PIDController(rtol, atol)`
+- **Initial Step**: `dt0=1e-12` (critical for stiff mechanism gradients)
 
 ---
 
@@ -186,21 +142,20 @@ The reactor uses `diffrax.diffeqsolve` with:
 | `reactor.py` | ODE integration | `reactor_rhs`, `ReactorNet.advance` |
 | `loader.py` | Mechanism parsing | `load_mechanism` |
 | `test_gradients.py` | Gradient validation | `compare_gradients` |
-| `diagnose_jp10_nan.py` | NaN debugging | Traces gradient failure source |
 
 ---
 
 ## Recommended Next Steps
 
 ### High Priority
-1. **Fix JP-10 gradients**: Try `BacksolveAdjoint` with implicit solver
-2. **Add batch profiling**: Benchmark `jax.vmap` with 100+ reactors
-3. **GPU testing**: Verify JAX GPU acceleration works correctly
+1. **Add batch profiling**: Benchmark `jax.vmap` with 100+ reactors
+2. **GPU testing**: Verify JAX GPU acceleration works correctly
+3. **Add more mechanisms**: Test with larger mechanisms (e.g., LLNL)
 
 ### Medium Priority
-4. **Add more mechanisms**: Test with larger mechanisms (e.g., LLNL)
-5. **Improve error messages**: Add validation for mechanism loading
-6. **Documentation**: Expand wiki with usage examples
+4. **Improve error messages**: Add validation for mechanism loading
+5. **Documentation**: Expand wiki with usage examples
+6. **Integration**: Add support for constant-volume reactors
 
 ### Low Priority
 7. **Performance optimization**: Profile and optimize hot paths
@@ -211,15 +166,12 @@ The reactor uses `diffrax.diffeqsolve` with:
 
 ## Session Log Summary
 
-1. Diagnosed "factor of 2" gradient discrepancy → Cantera FD clipping at Y=0
-2. Implemented non-zero baseline state for FD validation
-3. Fixed unit system (mol → kmol)
-4. Fixed irreversible reactions and three-body efficiencies
-5. Added concentration clipping and falloff masking for gradient safety
-6. Validated GRI-30 gradients (0.55% error) ✓
-7. Diagnosed JP-10 NaN as adjoint instability (not kinetics bug)
-8. Created CHANGELOG.md with accurate performance data
-9. Updated README and wiki with known limitations
+1. Diagnosed JP-10 NaN gradients using `jax_debug_nans` and systematic step size tracing.
+2. Identified `dt0=1e-8` as too large for stiff adjoint stability.
+3. Implemented fix in `reactor.py` by setting `dt0=1e-12`.
+4. Validated fix across multi-mechanism suite (GRI-30, JP-10).
+5. Updated documentation (README, Wiki, HANDOFF) with verified results.
+6. Committed and pushed all changes to `main`.
 
 ---
 
@@ -227,5 +179,5 @@ The reactor uses `diffrax.diffeqsolve` with:
 
 For questions about this session's work, refer to the conversation logs in:
 ```
-C:\Users\Benji\.gemini\antigravity\brain\91a03e2e-db52-4f90-814b-32c40edc91f3\.system_generated\logs\
+C:\Users\Benji\.gemini\antigravity\brain\853910ab-e4e7-4a4b-ba6d-8124d1c29541\.system_generated\logs\
 ```

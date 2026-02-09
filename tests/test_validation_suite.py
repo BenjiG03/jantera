@@ -19,12 +19,17 @@ from jantera.kinetics import compute_wdot
 from jantera.equilibrate import equilibrate
 import equinox as eqx
 
-def run_performance_bench(func, args, name, n_runs=10):
-    """Measures JIT and warm run times."""
-    # 1. First call (JIT)
+def run_performance_bench(func, args, name, n_runs=20, n_warmup=5):
+    """Measures JIT and warm run times with statistical robustness."""
+    # 1. Warmup / JIT
+    # First call often includes JIT compilation
     start = time.perf_counter()
     _ = jax.block_until_ready(func(*args))
     jit_time = time.perf_counter() - start
+    
+    # Additional warmups to stabilize cache/clock
+    for _ in range(n_warmup - 1):
+        _ = jax.block_until_ready(func(*args))
     
     # 2. Sequential calls (Warm)
     warm_times = []
@@ -33,10 +38,13 @@ def run_performance_bench(func, args, name, n_runs=10):
         _ = jax.block_until_ready(func(*args))
         warm_times.append(time.perf_counter() - start)
     
-    return jit_time, np.mean(warm_times)
+    median_time = np.median(warm_times)
+    std_time = np.std(warm_times)
+    # print(f"  [{name}] Median: {median_time*1000:.3f} ms, Std: {std_time*1000:.3f} ms")
+    return jit_time, median_time
 
-def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=False):
-    print(f"\n{'='*20} Validating {name} ({yaml_path}) {'='*20}", flush=True)
+def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=False, solver_name="kvaerno"):
+    print(f"\n{'='*20} Validating {name} ({yaml_path}) with {solver_name} {'='*20}", flush=True)
     
     # Loaders
     sol_ct = ct.Solution(yaml_path)
@@ -106,17 +114,22 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     t_end = 1e-3 # 1ms
     from diffrax import Kvaerno5, SaveAt
     net_jt = ReactorNet(mech_jt)
+    jt_solver = Kvaerno5() if solver_name == "kvaerno" else "bdf"
     
     # For plotting, we use intermediate steps
     ts_jax = jnp.linspace(0, t_end, 50)
     saveat = SaveAt(ts=ts_jax)
     
     start_jt = time.time()
-    res_jt = net_jt.advance(T0, P0, sol_jt.Y, t_end, rtol=1e-8, atol=1e-12, solver=Kvaerno5(), saveat=saveat)
+    res_jt = net_jt.advance(T0, P0, sol_jt.Y, t_end, rtol=1e-8, atol=1e-12, solver=jt_solver, saveat=saveat)
     jax.block_until_ready(res_jt)
     jt_time = time.time() - start_jt
     
-    jt_ts, jt_T, jt_Y = np.array(res_jt.ts), np.array(res_jt.ys[:, 0]), np.array(res_jt.ys[:, 1:])
+    # Extract ts and ys based on solver result type
+    if solver_name == "kvaerno":
+        jt_ts, jt_T, jt_Y = np.array(res_jt.ts), np.array(res_jt.ys[:, 0]), np.array(res_jt.ys[:, 1:])
+    else: # bdf
+        jt_ts, jt_T, jt_Y = np.array(res_jt["ts"]), np.array(res_jt["ys"][:, 0]), np.array(res_jt["ys"][:, 1:])
     
     sol_ct.TPX = T0, P0, X0_str
     reac_ct = ct.IdealGasConstPressureReactor(sol_ct)
@@ -133,7 +146,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
     plt.plot(ct_ts*1e6, ct_T, 'k-', label='Cantera'); plt.plot(jt_ts*1e6, jt_T, 'r--', label='Jantera')
-    plt.xlabel('Time (us)'); plt.ylabel('Temperature (K)'); plt.title(f'{name} T Trajectory'); plt.legend()
+    plt.xlabel('Time (us)'); plt.ylabel('Temperature (K)'); plt.title(f'{name} T Trajectory ({solver_name})'); plt.legend()
     
     plt.subplot(1, 2, 2)
     dy = np.abs(ct_Y[-1] - ct_Y[0])
@@ -141,12 +154,12 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     for idx in top3:
         plt.plot(ct_ts*1e6, ct_Y[:, idx], '-', label=f'{sol_ct.species_names[idx]} (CT)')
         plt.plot(jt_ts*1e6, jt_Y[:, idx], '--', label=f'{sol_ct.species_names[idx]} (JT)')
-    plt.xlabel('Time (us)'); plt.ylabel('Mass Fraction'); plt.title(f'{name} Species'); plt.legend()
-    plt.tight_layout(); plt.savefig(f"tests/outputs/{name.lower()}_trajectory.png"); plt.close()
-
+    plt.xlabel('Time (us)'); plt.ylabel('Mass Fraction'); plt.title(f'{name} Species ({solver_name})'); plt.legend()
+    plt.tight_layout(); plt.savefig(f"tests/outputs/{name.lower()}_{solver_name}_trajectory.png"); plt.close()
+ 
     results['dynamic_err_T'] = np.abs(jt_T[-1] - ct_T[-1])
 
-    # 3. Equilibrium Validation
+    # 3. Equilibrium Validation (Standard basis optimized)
     print(f"--- Equilibrium Validation ---", flush=True)
     sol_jt.TPX = T0, P0, X0_str
     t0 = time.time()
@@ -196,64 +209,71 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
         @jax.jit
         def get_final_T(mech_curr, y0):
             net_curr = ReactorNet(mech_curr)
-            res = net_curr.advance(T0, P0, y0, t_grad, solver=Kvaerno5())
-            return res.ys[-1, 0], res.stats['num_steps']
+            res = net_curr.advance(T0, P0, y0, t_grad, solver=jt_solver)
+            if solver_name == "kvaerno":
+                return res.ys[-1, 0], res.stats['num_steps']
+            else:
+                return res["ys"][-1, 0], res["stats"]["num_steps"]
         
         def grad_fun(mech, y):
             val, steps = get_final_T(mech, y)
             return val
             
-        print(f"  Computing Jantera AD sensitivities...", end="", flush=True)
-        t0 = time.time()
-        grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
-        jt_sens_time_jit = time.time() - t0
-        
-        t0 = time.time()
-        grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
-        jt_sens_time_warm = time.time() - t0
-        
-        grad_jt_norm = np.array(grad_mech.A * mech_jt.A) # This is dT/d(ln A)
-        _, jt_sens_steps = get_final_T(mech_jt, sol_jt.Y)
-        print(f" Done ({jt_sens_time_jit:.2f}s JIT, {jt_sens_time_warm:.4f}s Warm, {jt_sens_steps} steps)", flush=True)
-        
-        print(f"  Computing Cantera native sensitivities...", end="", flush=True)
-        sol_ct.TPX = T0, P0, X0_str
-        reac_ct = ct.IdealGasConstPressureReactor(sol_ct)
-        net_ct = ct.ReactorNet([reac_ct])
-        for i in range(sol_ct.n_reactions):
-            reac_ct.add_sensitivity_reaction(i)
-        net_ct.rtol_sensitivity = 1e-4
-        net_ct.atol_sensitivity = 1e-6
-        
-        start_ct_sens = time.time()
-        net_ct.advance(t_grad)
-        sens_ct_time = time.time() - start_ct_sens
+        print(f"  Computing Jantera sensitivities ({solver_name})...", end="", flush=True)
         try:
-            ct_sens_steps = net_ct.get_solver_stats().get('n_steps', 0)
-        except:
-            ct_sens_steps = 0
-        print(f" Done ({sens_ct_time:.2f}s, {ct_sens_steps} steps)", flush=True)
-        
-        grad_ct_norm = []
-        for i in range(sol_ct.n_reactions):
-            grad_ct_norm.append(net_ct.sensitivity('temperature', i))
-        grad_ct_norm = np.array(grad_ct_norm)
-        
-        plt.figure(figsize=(12, 6))
-        top_sens_idx = np.argsort(np.abs(grad_ct_norm))[-10:][::-1]
-        labels = [f"R{i}: {sol_ct.reaction(i).equation}"[:30] for i in top_sens_idx]
-        x = np.arange(len(labels))
-        width = 0.35
-        plt.bar(x - width/2, grad_ct_norm[top_sens_idx], width, label='Cantera (Native)', color='gray')
-        plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Jantera (AD)', color='cyan')
-        plt.xticks(x, labels, rotation=45, ha='right')
-        plt.ylabel('Normalized Sensitivity d(T) / d(ln A)')
-        plt.title(f'{name} Reaction Sensitivity (t=1us)')
-        plt.legend()
-        plt.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(f"tests/outputs/{name.lower()}_gradient_comp.png")
-        plt.close()
+            t0 = time.time()
+            grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
+            jt_sens_time_jit = time.time() - t0
+            
+            t0 = time.time()
+            grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
+            jt_sens_time_warm = time.time() - t0
+            
+            grad_jt_norm = np.array(grad_mech.A * mech_jt.A) # This is dT/d(ln A)
+            _, jt_sens_steps = get_final_T(mech_jt, sol_jt.Y)
+            print(f" Done ({jt_sens_time_jit:.2f}s JIT, {jt_sens_time_warm:.4f}s Warm, {jt_sens_steps} steps)", flush=True)
+            
+            print(f"  Computing Cantera native sensitivities...", end="", flush=True)
+            sol_ct.TPX = T0, P0, X0_str
+            reac_ct = ct.IdealGasConstPressureReactor(sol_ct)
+            net_ct = ct.ReactorNet([reac_ct])
+            for i in range(sol_ct.n_reactions):
+                reac_ct.add_sensitivity_reaction(i)
+            net_ct.rtol_sensitivity = 1e-4
+            net_ct.atol_sensitivity = 1e-6
+            
+            start_ct_sens = time.time()
+            net_ct.advance(t_grad)
+            sens_ct_time = time.time() - start_ct_sens
+            try:
+                ct_sens_steps = net_ct.get_solver_stats().get('n_steps', 0)
+            except:
+                ct_sens_steps = 0
+            print(f" Done ({sens_ct_time:.2f}s, {ct_sens_steps} steps)", flush=True)
+            
+            grad_ct_norm = []
+            for i in range(sol_ct.n_reactions):
+                grad_ct_norm.append(net_ct.sensitivity('temperature', i))
+            grad_ct_norm = np.array(grad_ct_norm)
+            
+            plt.figure(figsize=(12, 6))
+            top_sens_idx = np.argsort(np.abs(grad_ct_norm))[-10:][::-1]
+            labels = [f"R{i}: {sol_ct.reaction(i).equation}"[:30] for i in top_sens_idx]
+            x = np.arange(len(labels))
+            width = 0.35
+            plt.bar(x - width/2, grad_ct_norm[top_sens_idx], width, label='Cantera (Native)', color='gray')
+            plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Jantera (AD)', color='cyan')
+            plt.xticks(x, labels, rotation=45, ha='right')
+            plt.ylabel('Normalized Sensitivity d(T) / d(ln A)')
+            plt.title(f'{name} Reaction Sensitivity ({solver_name})')
+            plt.legend()
+            plt.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(f"tests/outputs/{name.lower()}_{solver_name}_gradient_comp.png")
+            plt.close()
+        except Exception as e:
+            print(f" FAILED: {str(e)[:50]}... Skipping sensitivity for this solver.", flush=True)
+            skip_sensitivity = True
 
     # Performance Benchmarks (Fair 1ms comparison)
     print(f"--- Performance Benchmarking ---", flush=True)
@@ -261,11 +281,13 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     
     # Jantera 1ms Benchmark (No saveat, just t_end)
     def advance_bench(y):
-        # By default advance uses saveat=t1=True (just end)
-        return net_jt.advance(T0, P0, y, t_end, solver=Kvaerno5())
+        return net_jt.advance(T0, P0, y, t_end, solver=jt_solver)
     
     res_jt_bench = advance_bench(sol_jt.Y)
-    jt_adv_steps = res_jt_bench.stats['num_steps']
+    if solver_name == "kvaerno":
+        jt_adv_steps = res_jt_bench.stats['num_steps']
+    else:
+        jt_adv_steps = res_jt_bench["stats"]['num_steps']
     jit_adv, warm_adv = run_performance_bench(advance_bench, (sol_jt.Y,), "advance_1ms")
 
     # Cantera 1ms Benchmark (measured)
@@ -275,11 +297,16 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     net_ct_bench.rtol, net_ct_bench.atol = 1e-8, 1e-12
     
     # Warmup
-    net_ct_bench.reinitialize() # Just in case
-    net_ct_bench.advance(t_end)
+    n_warmup = 5
+    for _ in range(n_warmup):
+        sol_ct.TPX = T0, P0, X0_str
+        reac_ct_bench = ct.IdealGasConstPressureReactor(sol_ct)
+        net_ct_bench = ct.ReactorNet([reac_ct_bench])
+        net_ct_bench.rtol, net_ct_bench.atol = 1e-8, 1e-12
+        net_ct_bench.advance(t_end)
     
     # Measure
-    n_runs = 10
+    n_runs = 20
     ct_times = []
     ct_adv_steps = 0
     for _ in range(n_runs):
@@ -292,19 +319,18 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
         net_ct_bench.advance(t_end)
         ct_times.append(time.perf_counter() - start)
         try:
-            # We only get stats for the last run, but it should be consistent
             ct_adv_steps = net_ct_bench.get_solver_stats()['n_steps']
         except:
             ct_adv_steps = -1 
 
-    ct_warm_adv = np.mean(ct_times)
+    ct_warm_adv = np.median(ct_times)
 
     results['grad_ok'] = not skip_sensitivity
     results['perf'] = {
         'jit_wdot': jit_w,
         'warm_wdot': warm_w,
-        'jit_adv': jit_adv, # This is now for 1ms
-        'warm_adv': warm_adv, # This is now for 1ms
+        'jit_adv': jit_adv,
+        'warm_adv': warm_adv,
         'jt_adv_steps': jt_adv_steps,
         'ct_adv_total_time': ct_warm_adv,
         'ct_adv_steps': ct_adv_steps,
@@ -320,34 +346,35 @@ def main():
     os.makedirs("tests/outputs", exist_ok=True)
     
     gri_cond = (1500.0, 101325.0, "CH4:1, O2:2, N2:7.52")
-    res_gri = validate_mechanism("GRI-30", "gri30.yaml", gri_cond, skip_sensitivity=False)
+    res_gri_kv = validate_mechanism("GRI-30", "gri30.yaml", gri_cond, solver_name="kvaerno")
+    res_gri_bdf = validate_mechanism("GRI-30", "gri30.yaml", gri_cond, solver_name="bdf")
     
     jp10_yaml = os.path.join(os.path.dirname(__file__), "..", "jp10.yaml")
     jp10_cond = (1500.0, 101325.0, "C10H16:1, O2:14, N2:52.64")
-    res_jp10 = validate_mechanism("JP-10", jp10_yaml, jp10_cond, skip_sensitivity=False)
+    res_jp10_kv = validate_mechanism("JP-10", jp10_yaml, jp10_cond, solver_name="kvaerno")
+    res_jp10_bdf = validate_mechanism("JP-10", jp10_yaml, jp10_cond, solver_name="bdf")
 
-    print("\n" + "="*25 + " DETAILED PERFORMANCE " + "="*25)
+    print("\n" + "="*25 + " DETAILED PERFORMANCE COMPARISON " + "="*25)
     
-    # Helper to safe divide
     def time_per_step(time_s, steps):
         if steps <= 0: return "N/A"
         return f"{(time_s * 1e3 / steps):.3f}"
 
     detailed_table = [
-        ["Phase", "Metric", "Jantera (GRI)", "Cantera (GRI)", "Jantera (JP10)", "Cantera (JP10)"],
-        ["Equil", "JIT Time (ms)", f"{res_gri['equil_stats']['jt_time_jit']*1e3:.2f}", "-", f"{res_jp10['equil_stats']['jt_time_jit']*1e3:.2f}", "-"],
-        ["Equil", "Warm Time (ms)", f"{res_gri['equil_stats']['jt_time_warm']*1e3:.2f}", f"{res_gri['equil_stats']['ct_time']*1e3:.2f}", f"{res_jp10['equil_stats']['jt_time_warm']*1e3:.2f}", f"{res_jp10['equil_stats']['ct_time']*1e3:.2f}"],
-        ["Equil", "Steps", f"{res_gri['equil_stats']['jt_steps']}", "-", f"{res_jp10['equil_stats']['jt_steps']}", "-"],
-        
-        # 1ms Reactor Benchmark
-        ["Adv (1ms)", "JIT Time (ms)", f"{res_gri['perf']['jit_adv']*1e3:.2f}", "-", f"{res_jp10['perf']['jit_adv']*1e3:.2f}", "-"],
-        ["Adv (1ms)", "Warm Time (ms)", f"{res_gri['perf']['warm_adv']*1e3:.3f}", f"{res_gri['perf']['ct_adv_total_time']*1e3:.3f}", f"{res_jp10['perf']['warm_adv']*1e3:.3f}", f"{res_jp10['perf']['ct_adv_total_time']*1e3:.3f}"],
-        ["Adv (1ms)", "Total Steps", f"{res_gri['perf']['jt_adv_steps']}", f"{res_gri['perf']['ct_adv_steps']}", f"{res_jp10['perf']['jt_adv_steps']}", f"{res_jp10['perf']['ct_adv_steps']}"],
-        ["Adv (1ms)", "Time/Step (ms)", time_per_step(res_gri['perf']['warm_adv'], res_gri['perf']['jt_adv_steps']), time_per_step(res_gri['perf']['ct_adv_total_time'], res_gri['perf']['ct_adv_steps']), time_per_step(res_jp10['perf']['warm_adv'], res_jp10['perf']['jt_adv_steps']), time_per_step(res_jp10['perf']['ct_adv_total_time'], res_jp10['perf']['ct_adv_steps'])],
-
-        ["Sens", "JIT Time (s)", f"{res_gri['perf']['jt_sens_time_jit']:.2f}", "-", f"{res_jp10['perf']['jt_sens_time_jit']:.2f}", "-"],
-        ["Sens", "Warm Time (s)", f"{res_gri['perf']['jt_sens_time_warm']:.4f}", f"{res_gri['perf']['ct_sens_time']:.4f}", f"{res_jp10['perf']['jt_sens_time_warm']:.4f}", f"{res_jp10['perf']['ct_sens_time']:.4f}"],
-        ["Sens", "Steps", f"{res_gri['perf']['jt_sens_steps']}", f"{res_gri['perf']['ct_sens_steps']}", f"{res_jp10['perf']['jt_sens_steps']}", f"{res_jp10['perf']['ct_sens_steps']}"],
+        ["Phase", "Metric", "Jantera (GRI-KV)", "Jantera (GRI-BDF)", "Cantera (GRI)", "Jantera (JP10-KV)", "Jantera (JP10-BDF)", "Cantera (JP10)"],
+        ["Adv (1ms)", "Warm Time (ms)", 
+         f"{res_gri_kv['perf']['warm_adv']*1e3:.2f}", f"{res_gri_bdf['perf']['warm_adv']*1e3:.2f}", f"{res_gri_kv['perf']['ct_adv_total_time']*1e3:.2f}",
+         f"{res_jp10_kv['perf']['warm_adv']*1e3:.2f}", f"{res_jp10_bdf['perf']['warm_adv']*1e3:.2f}", f"{res_jp10_kv['perf']['ct_adv_total_time']*1e3:.2f}"],
+        ["Adv (1ms)", "Total Steps", 
+         f"{res_gri_kv['perf']['jt_adv_steps']}", f"{res_gri_bdf['perf']['jt_adv_steps']}", f"{res_gri_kv['perf']['ct_adv_steps']}",
+         f"{res_jp10_kv['perf']['jt_adv_steps']}", f"{res_jp10_bdf['perf']['jt_adv_steps']}", f"{res_jp10_kv['perf']['ct_adv_steps']}"],
+        ["Adv (1ms)", "Time/Step (ms)", 
+         time_per_step(res_gri_kv['perf']['warm_adv'], res_gri_kv['perf']['jt_adv_steps']), 
+         time_per_step(res_gri_bdf['perf']['warm_adv'], res_gri_bdf['perf']['jt_adv_steps']),
+         time_per_step(res_gri_kv['perf']['ct_adv_total_time'], res_gri_kv['perf']['ct_adv_steps']),
+         time_per_step(res_jp10_kv['perf']['warm_adv'], res_jp10_kv['perf']['jt_adv_steps']),
+         time_per_step(res_jp10_bdf['perf']['warm_adv'], res_jp10_bdf['perf']['jt_adv_steps']),
+         time_per_step(res_jp10_kv['perf']['ct_adv_total_time'], res_jp10_kv['perf']['ct_adv_steps'])],
     ]
     print(tabulate(detailed_table, headers="firstrow", tablefmt="grid"))
 

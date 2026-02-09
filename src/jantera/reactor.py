@@ -5,6 +5,7 @@ import diffrax
 from .kinetics import compute_wdot
 from .thermo import get_h_RT
 from .constants import R_GAS
+from .solvers.bdf import bdf_solve
 
 @jax.jit
 def reactor_rhs(t, state, args):
@@ -42,37 +43,48 @@ def reactor_rhs(t, state, args):
     
     return jnp.concatenate([jnp.array([dTdt]), dYdt])
 
+@eqx.filter_jit
 class ReactorNet(eqx.Module):
-    """Reactor network solver using diffrax."""
+    """Reactor network solver using diffrax or custom BDF."""
     mech: any
     
-    def advance(self, T0, P, Y0, t_end, rtol=1e-7, atol=1e-10, solver=None, saveat=None):
+    @eqx.filter_jit
+    def advance(self, T0, P, Y0, t_end, rtol=1e-7, atol=1e-10, solver=None, saveat=None, max_steps=100000):
         """Simulate combustion trajectory."""
         state0 = jnp.concatenate([jnp.array([T0]), Y0])
+        args = (P, self.mech)
         
-        # Define solver
+        if solver == "bdf":
+            state = bdf_solve(reactor_rhs, 0.0, t_end, state0, args=args, rtol=rtol, atol=atol, max_steps=max_steps)
+            # Return a dict (common in JAX/Equinox if not specialized)
+            # but better to return something with .ys and .ts to match diffrax
+            return eqx.filter_jit(lambda s: {
+                "ts": jnp.array([s.t]),
+                "ys": s.y[jnp.newaxis, :],
+                "stats": {
+                    "num_steps": s.n_steps,
+                    "n_fevals": s.n_fevals,
+                    "n_jevals": s.n_jevals
+                }
+            })(state)
+        
+        # Define diffrax solver
         term = diffrax.ODETerm(reactor_rhs)
         if solver is None:
             solver = diffrax.Kvaerno5()
-        
-        # Max steps should be high for chemical kinetics
-        stepsize_controller = diffrax.PIDController(rtol=rtol, atol=atol)
-        
         if saveat is None:
             saveat = diffrax.SaveAt(t1=True)
-
+            
         sol = diffrax.diffeqsolve(
             term,
             solver,
             t0=0.0,
             t1=t_end,
-            dt0=1e-12,
+            dt0=1e-8,
             y0=state0,
-            args=(P, self.mech),
-            stepsize_controller=stepsize_controller,
-            max_steps=1000000,
+            args=args,
+            stepsize_controller=diffrax.PIDController(rtol=rtol, atol=atol),
             saveat=saveat,
-            adjoint=diffrax.RecursiveCheckpointAdjoint()
+            max_steps=max_steps
         )
-        
         return sol

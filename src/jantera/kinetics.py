@@ -3,8 +3,8 @@ import jax.numpy as jnp
 from .constants import R_GAS, ONE_ATM
 from .thermo import get_h_RT, get_s_R
 
-@jax.jit
-def compute_kf(T, conc, mech):
+@jax.jit(static_argnums=(3,))
+def compute_kf(T, conc, mech, use_experimental_sparse=False):
     """Compute forward rate constants for all reactions.
     
     T: float, temperature [K]
@@ -12,33 +12,34 @@ def compute_kf(T, conc, mech):
     mech: MechData object
     """
     # 1. Standard Arrhenius: k = A * T^b * exp(-Ea / (R * T))
-    # Ea is in J/mol
     log_kf = jnp.log(mech.A) + mech.b * jnp.log(T) - mech.Ea / (R_GAS * T)
     kf = jnp.exp(log_kf)
     
     # 2. Three-body Enhancement
-    # [M]_j = sum_i (eff_ji * conc_i)
-    # Clip concentration to 0 for m_eff
-    m_eff = jnp.dot(mech.efficiencies, jnp.maximum(conc, 0.0))
-    # Applied to three-body and falloff reactions
+    safe_conc = jnp.maximum(conc, 0.0)
+    
+    if use_experimental_sparse:
+        # Experimental Sparse Path (BCOO)
+        m_eff = mech.efficiencies_sparse @ safe_conc
+    else:
+        # Optimized "dense-sparse" approach
+        sum_conc = jnp.sum(safe_conc)
+        padded_conc = jnp.concatenate([safe_conc, jnp.array([0.0])])
+        eff_conc = padded_conc[mech.efficiencies_idx]
+        eff_diff = mech.efficiencies_val - mech.default_efficiency[:, None]
+        m_eff = mech.default_efficiency * sum_conc + jnp.sum(eff_diff * eff_conc, axis=1)
+        
     kf = jnp.where(mech.is_three_body, kf * m_eff, kf)
     
     # 3. Falloff (Troe/Lindemann)
-    # k_inf = kf (already computed)
-    # k_0 = A_low * T^b_low * exp(-Ea_low / RT)
+    # k_inf already computed as kf_orig (before 3-body)
+    k_inf = jnp.maximum(jnp.exp(log_kf), 1e-100)
+    
+    # k0_eff = k0 * m_eff
     log_k0 = jnp.log(mech.A_low) + mech.b_low * jnp.log(T) - mech.Ea_low / (R_GAS * T)
-    k0 = jnp.exp(log_k0)
+    k0_eff = jnp.exp(log_k0) * m_eff
     
-    # Pr = k0 * [M] / k_inf
-    # Note: kf already contains m_eff for falloff reactions (it was marked is_three_body)
-    # So we need k_inf = kf_orig, and k0_eff = k0 * m_eff
-    # Pr = (k0 * m_eff) / k_inf_standard
-    
-    # Let's re-calculate to be clearer and avoid double multiplication for falloff
-    # kf currently is A*T^b*exp(-Ea/RT) * m_eff (if three-body)
-    # For falloff: k_inf = A*T^b*exp(-Ea/RT)
-    k_inf = jnp.maximum(jnp.exp(jnp.log(mech.A) + mech.b * jnp.log(T) - (mech.Ea) / (R_GAS * T)), 1e-100)
-    Pr = (k0 * m_eff) / k_inf
+    Pr = k0_eff / k_inf
     Pr = jnp.maximum(Pr, 1e-20)
     
     # Troe blending factor F
@@ -59,46 +60,38 @@ def compute_kf(T, conc, mech):
     N = 0.75 - 1.27 * log10_Fcent
     
     denom = N - 0.14 * (log10_Pr + C)
-    # Avoid division by zero in exponent
     safe_denom = jnp.where(jnp.abs(denom) > 1e-10, denom, 1e-10)
     f_exponent = 1.0 / (1.0 + ((log10_Pr + C) / safe_denom)**2)
     F = jnp.power(10.0, log10_Fcent * f_exponent)
     
-    # If not Troe (Lindemann), F = 1.0 (handled by troe_params being zero or default)
-    
     kf_falloff = k_inf * (safe_Pr / (1.0 + safe_Pr)) * F
-    
-    # Update kf for falloff reactions
     kf = jnp.where(mech.is_falloff, kf_falloff, kf)
     
     return kf
 
 @jax.jit
 def compute_Kc(T, mech):
-    """Compute equilibrium constants Kc for all reactions.
-    
-    Kc = exp(-DG/RT) * (P_atm / RT)^Dnu
-    """
+    """Compute equilibrium constants Kc for all reactions."""
     h_RT = get_h_RT(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
     s_R = get_s_R(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
-    
-    # g_RT = H/RT - S/R (Gibbs free energy normalized by RT)
     g_RT = h_RT - s_R
     
-    # Delta G / RT = sum(nu_i * g_i)
-    # net_stoich: (n_reactions, n_species)
-    dg_RT = jnp.dot(mech.net_stoich, g_RT)
+    # Pad g_RT with 0 for dummy indices
+    padded_g_RT = jnp.concatenate([g_RT, jnp.array([0.0])])
     
-    # Dnu = sum(nu_i)
-    dnu = jnp.sum(mech.net_stoich, axis=1)
+    # Delta G / RT = sum(nu_prod * g_prod) - sum(nu_reac * g_reac)
+    dg_RT_reac = jnp.sum(mech.reactants_nu * padded_g_RT[mech.reactants_idx], axis=1)
+    dg_RT_prod = jnp.sum(mech.products_nu * padded_g_RT[mech.products_idx], axis=1)
+    dg_RT = dg_RT_prod - dg_RT_reac
     
-    # Kc = exp(-dg_RT) * (P_atm / (R * T))^dnu
+    # Dnu = sum(nu_prod) - sum(nu_reac)
+    dnu = jnp.sum(mech.products_nu, axis=1) - jnp.sum(mech.reactants_nu, axis=1)
+    
     kc = jnp.exp(-dg_RT) * (ONE_ATM / (R_GAS * T))**dnu
-    
     return kc
 
-@jax.jit
-def compute_wdot(T, P, Y, mech):
+@jax.jit(static_argnums=(4,))
+def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
     """Compute net production rates for all species.
     
     Returns: (wdot, h_mass, cp_mass, rho)
@@ -108,33 +101,52 @@ def compute_wdot(T, P, Y, mech):
     cp_mass, h_mass, rho = compute_mixture_props(T, P, Y, mech)
     
     # 2. Concentrations [mol/m^3]
-    # [C]_i = rho * Y_i / MW_i
     conc = rho * Y / mech.mol_weights
     
     # 3. Forward and reverse rate constants
-    kf = compute_kf(T, conc, mech)
+    kf = compute_kf(T, conc, mech, use_experimental_sparse)
     kc = compute_Kc(T, mech)
     kr = kf / (kc + 1e-100)
     
-    # 4. Rates of progress for each reaction
-    # q = kf * prod(conc^nu_reac) - kr * prod(conc^nu_prod)
-    
-    # conc can become slightly negative during integration; clip for stability
-    # Use 1e-30 as floor to avoid nan gradients with fractional stoich
+    # 4. Rates of progress
     safe_conc = jnp.maximum(conc, 1e-30)
     
-    # Use jnp.prod(jnp.power) with a safe mask to avoid 0^0 in gradients.
-    # We use jnp.where to only apply power to species with non-zero stoichiometry.
-    f_rop = kf * jnp.prod(jnp.power(jnp.where(mech.reactant_stoich > 0, safe_conc, 1.0), mech.reactant_stoich), axis=1)
-    r_rop = kr * jnp.prod(jnp.power(jnp.where(mech.product_stoich > 0, safe_conc, 1.0), mech.product_stoich), axis=1)
+    if use_experimental_sparse:
+        # Experimental Sparse Path for ROP
+        # f_rop = kf * exp(sum(nu * log(conc)))
+        log_conc = jnp.log(safe_conc)
+        f_rop = kf * jnp.exp(mech.reactant_stoich_sparse @ log_conc)
+        r_rop = kr * jnp.exp(mech.product_stoich_sparse @ log_conc)
+    else:
+        padded_conc = jnp.concatenate([safe_conc, jnp.array([1.0])]) # Pad with 1.0 for products in power
+        reac_conc = padded_conc[mech.reactants_idx]
+        f_rop = kf * jnp.prod(jnp.power(reac_conc, mech.reactants_nu), axis=1)
+        prod_conc = padded_conc[mech.products_idx]
+        r_rop = kr * jnp.prod(jnp.power(prod_conc, mech.products_nu), axis=1)
     
-    # Mask reverse rates for irreversible reactions
     r_rop = jnp.where(mech.is_reversible, r_rop, 0.0)
-    
     rop = f_rop - r_rop
     
     # 5. Net production rates [mol/m^3/s]
-    # wdot_i = sum_j (nu_ij * q_j)
-    wdot = jnp.dot(mech.net_stoich.T, rop)
-    
+    if use_experimental_sparse:
+        wdot = rop @ mech.net_stoich_sparse
+    else:
+        # Optimized gathering: subtract reactants, add products
+        # We need to map rop to species.
+        # wdot = sum(rop * products_nu) - sum(rop * reactants_nu)
+        
+        # Flattened indices and values for scatter_add
+        def scatter_stoich(idx, nu, rop_vals, n_spec):
+            # idx: (n_rxn, max_nu)
+            # nu: (n_rxn, max_nu)
+            # rop_vals: (n_rxn,)
+            flat_idx = idx.reshape(-1)
+            flat_val = (rop_vals[:, None] * nu).reshape(-1)
+            # use .at[].add() which is vectorized scatter_add
+            return jnp.zeros(n_spec + 1).at[flat_idx].add(flat_val)[:-1]
+
+        wdot_prod = scatter_stoich(mech.products_idx, mech.products_nu, rop, mech.n_species)
+        wdot_reac = scatter_stoich(mech.reactants_idx, mech.reactants_nu, rop, mech.n_species)
+        wdot = wdot_prod - wdot_reac
+        
     return wdot, h_mass, cp_mass, rho

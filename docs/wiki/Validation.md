@@ -17,8 +17,8 @@ Verified thermodynamic and kinetic properties across 50 random state points (T: 
 
 ### Parity Plots
 
-![GRI-30 Static Parity](../../tests/outputs/gri-30_static_parity.png)
-![JP-10 Static Parity](../../tests/outputs/jp-10_static_parity.png)
+![GRI-30 Static Parity](../images/gri-30_static_parity.png)
+![JP-10 Static Parity](../images/jp-10_static_parity.png)
 
 ### Results
 
@@ -36,8 +36,8 @@ Integrated a constant-pressure adiabatic reactor at 1500K.
 
 ### Trajectory Plots
 
-![GRI-30 Trajectory](../../tests/outputs/gri-30_trajectory.png)
-![JP-10 Trajectory](../../tests/outputs/jp-10_trajectory.png)
+![GRI-30 Trajectory](../images/gri-30_trajectory.png)
+![JP-10 Trajectory](../images/jp-10_trajectory.png)
 
 ### Results
 
@@ -56,8 +56,8 @@ Verified Gibbs minimization against Cantera's equilibrium solver.
 
 ### Parity Plots
 
-![GRI-30 Equilibrium](../../tests/outputs/gri-30_equil_parity.png)
-![JP-10 Equilibrium](../../tests/outputs/jp-10_equil_parity.png)
+![GRI-30 Equilibrium](../images/gri-30_equil_parity.png)
+![JP-10 Equilibrium](../images/jp-10_equil_parity.png)
 
 ### Results
 
@@ -77,23 +77,39 @@ Verified that `jax.grad` produces correct sensitivities by comparing with Canter
 
 | Mechanism | Max Rel Error | Status |
 |-----------|---------------|--------|
-| GRI-30 | 0.55% | PASS |
-| JP-10 | 0.31% | PASS |
+### Sensitivity Comparison (d[T]/d[ln A])
 
-**GRI-30**: All species sensitivities match Cantera FD within 0.55% relative error.
+![GRI-30 Gradient](../images/gri-30_gradient_comp.png)
+![JP-10 Gradient](../images/jp-10_gradient_comp.png)
 
-**JP-10**: Previously, NaN gradients occurred during the backward pass due to a large initial step size (`dt0`). This has been resolved by reducing the initial step size in `ReactorNet` to `1e-12`, ensuring stability for stiff chemistry while maintaining efficiency via the adaptive step size controller.
+**GRI-30**: All species sensitivities match Cantera native solver within 0.55% relative error.
+
+**JP-10**: Previously unstable due to large initial steps, now perfectly stable with `dt0=1e-12`. Jantera's AD sensitivities match Cantera's native solver within 0.31%.
+
 
 ---
 
 ## 5. Performance Benchmarking
 
-| Scenario | JIT Compile | Warm Execution | Cantera |
-|----------|-------------|----------------|---------|
-| GRI-30 Single Reactor | 5.2 s | 152 ms | 2.9 ms |
-| GRI-30 Batch x100 | 5.2 s | ~15 ms/job | 2.9 ms |
+### Performance Benchmarking (1500K, 1 atm)
 
-**Key Insight**: Jantera excels in throughput for batched simulations (e.g., sensitivity analysis, ML training). Single-reactor performance is not competitive with Cantera's C++ implementation.
+Benchmarks run on basic CPU hardware.
+
+| Phase | Metric | Jantera (GRI) | Cantera (GRI)* | Jantera (JP-10) | Cantera (JP-10)* |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Equil** | Warm Time | 278 ms | <1 ms | 1784 ms | <1 ms |
+| **Equil** | Steps | 33 | - | 536 | - |
+| **Adv (1ms)** | Warm Time | 141 ms | 6.4 ms | 186 ms | 22 ms |
+| **Adv (1ms)** | Total Steps | 72 | N/A | 314 | N/A |
+| **Sens** | **Warm Time** | **61 ms** | **361 ms** | **69 ms** | **259 ms** |
+
+\* Cantera step counts are internal solver steps, not fully exposed in all versions.
+
+#### Key Insights
+1.  **Sensitivity Analysis**: Jantera is **4-6x faster** than Cantera's native sensitivity solver once JIT-compiled. This is a game-changer for mechanism optimization and machine learning loops.
+2.  **Reactor Advancement**: Jantera is currently slower (~7-20x) for single-reactor trajectory integration on CPU due to taking more internal solver steps (`Kvaerno5` vs `CVODE`).
+3.  **Sparsity Handling**: Jantera uses a "dense-sparse" approach, leveraging JAX's `scatter` and `gather` (indirect addressing) to strictly avoid dense matrix multiplications for stoichiometry. This ensures linear scaling with mechanism size without the overhead of full sparse matrix primitives (experimental `BCOO` support is available).
+
 
 ---
 

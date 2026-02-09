@@ -78,8 +78,6 @@ def load_mechanism(yaml_file: str) -> MechData:
         for sp, coeff in rxn.products.items():
             product_stoich[i, sol.species_index(sp)] = coeff
             
-        stoich_order = sum(rxn.reactants.values())
-        
         # Reaction types and parameters
         r_type = rxn.reaction_type
         rate = rxn.rate
@@ -95,9 +93,6 @@ def load_mechanism(yaml_file: str) -> MechData:
                 for sp_name, eff in eff_map.items():
                     efficiencies[i, sol.species_index(sp_name)] = eff
             
-            # Unit conversion: A is m^3/(kmol*s) for 2 reactants + 1 third body
-            # effective order = stoich_order + 1
-            n_eff = stoich_order + 1
             A[i] = rate.pre_exponential_factor
             b[i] = rate.temperature_exponent
             Ea[i] = rate.activation_energy
@@ -116,14 +111,11 @@ def load_mechanism(yaml_file: str) -> MechData:
                     efficiencies[i, sol.species_index(sp_name)] = eff
             
             # High-pressure limit
-            # effective order = stoich_order
             A[i] = rate.high_rate.pre_exponential_factor
             b[i] = rate.high_rate.temperature_exponent
             Ea[i] = rate.high_rate.activation_energy
             
             # Low-pressure limit
-            # effective order = stoich_order + 1
-            n_eff_low = stoich_order + 1
             A_low[i] = rate.low_rate.pre_exponential_factor
             b_low[i] = rate.low_rate.temperature_exponent
             Ea_low[i] = rate.low_rate.activation_energy
@@ -147,7 +139,57 @@ def load_mechanism(yaml_file: str) -> MechData:
             Ea[i] = rate.activation_energy
             
     net_stoich = product_stoich - reactant_stoich
+
+    # 3. Process Sparse Data
+    # Determine max dimensions
+    n_reac_list = [len(r.reactants) for r in sol.reactions()]
+    n_prod_list = [len(r.products) for r in sol.reactions()]
+    max_reactants = max(n_reac_list) if n_reac_list else 0
+    max_products = max(n_prod_list) if n_prod_list else 0
     
+    # Max efficiencies (only for reactions that have explicit efficiencies != default)
+    # Actually, let's just use the ones that are != default_efficiency
+    n_eff_list = []
+    for rxn in sol.reactions():
+        if rxn.third_body:
+            n_eff_list.append(len(rxn.third_body.efficiencies))
+        else:
+            n_eff_list.append(0)
+    max_efficiencies = max(n_eff_list) if n_eff_list else 0
+
+    reactants_idx = np.full((n_reactions, max_reactants), n_species, dtype=np.int32)
+    reactants_nu = np.zeros((n_reactions, max_reactants))
+    products_idx = np.full((n_reactions, max_products), n_species, dtype=np.int32)
+    products_nu = np.zeros((n_reactions, max_products))
+    
+    efficiencies_idx = np.full((n_reactions, max_efficiencies), n_species, dtype=np.int32)
+    efficiencies_val = np.zeros((n_reactions, max_efficiencies))
+    default_efficiency = np.zeros(n_reactions)
+
+    for i, rxn in enumerate(sol.reactions()):
+        for j, (sp, nu) in enumerate(rxn.reactants.items()):
+            reactants_idx[i, j] = sol.species_index(sp)
+            reactants_nu[i, j] = nu
+        for j, (sp, nu) in enumerate(rxn.products.items()):
+            products_idx[i, j] = sol.species_index(sp)
+            products_nu[i, j] = nu
+        
+        if rxn.third_body:
+            default_efficiency[i] = rxn.third_body.default_efficiency
+            for j, (sp, eff) in enumerate(rxn.third_body.efficiencies.items()):
+                efficiencies_idx[i, j] = sol.species_index(sp)
+                efficiencies_val[i, j] = eff
+        else:
+            default_efficiency[i] = 1.0 # Standard default for non-3-body? 
+            # Actually if not is_three_body, this value shouldn't matter but let's be safe.
+
+    # 4. Experimental BCOO Sparse Matrices
+    from jax.experimental import sparse
+    reactant_stoich_sparse = sparse.BCOO.fromdense(jnp.array(reactant_stoich))
+    product_stoich_sparse = sparse.BCOO.fromdense(jnp.array(product_stoich))
+    net_stoich_sparse = sparse.BCOO.fromdense(jnp.array(net_stoich))
+    efficiencies_sparse = sparse.BCOO.fromdense(jnp.array(efficiencies))
+
     return MechData(
         n_species=n_species,
         species_names=species_names,
@@ -161,6 +203,12 @@ def load_mechanism(yaml_file: str) -> MechData:
         nasa_T_low=jnp.array(nasa_T_low),
         nasa_T_high=jnp.array(nasa_T_high),
         n_reactions=n_reactions,
+        max_reactants=max_reactants,
+        max_products=max_products,
+        reactants_idx=jnp.array(reactants_idx),
+        reactants_nu=jnp.array(reactants_nu),
+        products_idx=jnp.array(products_idx),
+        products_nu=jnp.array(products_nu),
         reactant_stoich=jnp.array(reactant_stoich),
         product_stoich=jnp.array(product_stoich),
         net_stoich=jnp.array(net_stoich),
@@ -168,6 +216,10 @@ def load_mechanism(yaml_file: str) -> MechData:
         b=jnp.array(b),
         Ea=jnp.array(Ea),
         is_three_body=jnp.array(is_three_body),
+        max_efficiencies=max_efficiencies,
+        efficiencies_idx=jnp.array(efficiencies_idx),
+        efficiencies_val=jnp.array(efficiencies_val),
+        default_efficiency=jnp.array(default_efficiency),
         efficiencies=jnp.array(efficiencies),
         is_reversible=jnp.array(is_reversible),
         is_falloff=jnp.array(is_falloff),
@@ -175,5 +227,9 @@ def load_mechanism(yaml_file: str) -> MechData:
         b_low=jnp.array(b_low),
         Ea_low=jnp.array(Ea_low),
         troe_params=jnp.array(troe_params),
-        has_troe=jnp.array(has_troe)
+        has_troe=jnp.array(has_troe),
+        reactant_stoich_sparse=reactant_stoich_sparse,
+        product_stoich_sparse=product_stoich_sparse,
+        net_stoich_sparse=net_stoich_sparse,
+        efficiencies_sparse=efficiencies_sparse
     )

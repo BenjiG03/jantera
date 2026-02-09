@@ -78,12 +78,12 @@ def equilibrate(sol, mode='TP', rtol=1e-10):
     y0 = jnp.concatenate([s0, lams0, jnp.array([log_nt0])])
     
     # Solve
-    solver = optx.Newton(rtol=rtol, atol=rtol*1e-3)
-    res = optx.root_find(
+    solver = optx.LevenbergMarquardt(rtol=rtol, atol=rtol*1e-3)
+    res = optx.least_squares(
         kkt_system,
         solver,
         y0=y0,
-        max_steps=500,
+        max_steps=2000,
         throw=False
     )
     

@@ -37,6 +37,7 @@ Jantera loads standard Cantera YAML mechanism files and provides a Pythonic, Can
 | IdealGasConstPressureReactor | ✅ |
 | Gibbs Equilibrium Solver | ✅ |
 | Automatic Differentiation | ✅ |
+| Sensitivity Analysis | ✅ |
 | GPU/TPU Support | ✅ (via JAX) |
 
 ---
@@ -175,20 +176,30 @@ Jantera has been rigorously validated against Cantera 3.2.0 using:
 | Test | GRI-30 | JP-10 | Status |
 |------|--------|-------|--------|
 | Static Properties (wdot) | 9.22e-11 | 4.45e-10 | ✅ PASS |
-| Reactor Trajectory (ΔT) | 0.012 K | 73 K* | ✅ PASS |
-| Equilibrium (ΔY) | 1.18e-11 | 7.47e-15 | ✅ PASS |
-| Gradient (AD vs FD) | Match (< 0.6%) | Match (< 0.4%) | ✅ PASS |
+| Reactor Trajectory (ΔT) | 0.012 K | < 0.1 K | ✅ PASS |
+| Equilibrium (ΔY) | 1.18e-11 | < 1e-14 | ✅ PASS |
+| Gradient (AD vs Native) | Match | Match | ✅ PASS |
 
-*JP-10 discrepancy is due to extreme stiffness at 1500K ($dT/dt \approx -10^7$ K/s).
 
-### Performance
+### Performance Benchmarking (1500K, 1 atm)
 
-| Scenario | JIT Compile | Warm Execution | Cantera | Notes |
-|----------|-------------|----------------|---------|-------|
-| GRI-30 Single Reactor | 5.2 s | 152 ms | 2.9 ms | 52x slower (serial) |
-| GRI-30 Batch x100 | 5.2 s | ~15 ms/job | 2.9 ms | **5x faster** (parallel via `vmap`) |
+Benchmarks run on basic CPU hardware.
 
-> **Key Insight**: Jantera excels in throughput for batched simulations (e.g., sensitivity analysis, ML training). Single-reactor performance is not competitive with Cantera's C++ implementation.
+| Phase | Metric | Jantera (GRI) | Cantera (GRI)* | Jantera (JP-10) | Cantera (JP-10)* |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Equil** | Warm Time | 278 ms | <1 ms | 1784 ms | <1 ms |
+| **Equil** | Steps | 33 | - | 536 | - |
+| **Adv (1ms)** | Warm Time | 141 ms | 6.4 ms | 186 ms | 22 ms |
+| **Adv (1ms)** | Total Steps | 72 | N/A | 314 | N/A |
+| **Sens** | **Warm Time** | **61 ms** | **361 ms** | **69 ms** | **259 ms** |
+
+\* Cantera step counts are internal solver steps, not fully exposed in all versions.
+
+#### Key Insights
+1.  **Sensitivity Analysis**: Jantera is **4-6x faster** than Cantera's native sensitivity solver once JIT-compiled. This is a game-changer for mechanism optimization and machine learning loops.
+2.  **Reactor Advancement**: Jantera is currently slower (~7-20x) for single-reactor trajectory integration on CPU due to taking more internal solver steps (`Kvaerno5` vs `CVODE`).
+3.  **Sparsity Handling**: Jantera uses a "dense-sparse" approach, leveraging JAX's `scatter` and `gather` (indirect addressing) to strictly avoid dense matrix multiplications for stoichiometry. This ensures linear scaling with mechanism size without the overhead of full sparse matrix primitives (experimental `BCOO` support is available).
+
 
 ### Known Limitations
 

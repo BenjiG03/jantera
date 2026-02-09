@@ -2,6 +2,23 @@
 
 All notable changes to Jantera will be documented in this file.
 
+## [0.3.0] - 2026-02-08
+
+### Added
+- **Performance Benchmarking**: Comprehensive evaluation against Cantera 3.2.0 for Equilibrium, Reactor Advancement, and Sensitivity Analysis.
+- **Separated Timing Metrics**: JIT compilation time is now strictly decoupled from warm execution time, providing a more accurate view of runtime performance.
+- **Sensitivity Supremacy**: Demonstrated that Jantera's AD-based sensitivity analysis is **4-6x faster** than Cantera's native solver once JIT-compiled (e.g., 61ms vs 361ms for GRI-30).
+- **Sparsity Architecture**: Documented "dense-sparse" approach using JAX `scatter`/`gather` for stoichiometry, ensuring linear scaling with mechanism size without dense overhead.
+
+### Fixed
+- **Equilibrium Convergence**: Switched to `LevenbergMarquardt` solver and increased `max_steps` to 2000. Resolves convergence failures for large mechanisms like JP-10 (achieves < 1e-14 error).
+- **Reactor Stability for Stiff Kinetics**: Reduced initial step size (`dt0`) to `1e-12` in `ReactorNet`, resolving NaN gradients during adjoint solves for stiff JP-10 kinetics.
+- **Misspelling**: Corrected `IdealGasConstPressureReactor` attribute name in test suite.
+
+### Documentation
+- Updated `README.md` and Wiki with detailed parity plots and performance tables.
+- Added comprehensive `walkthrough.md` for performance breakdown.
+
 ## [0.2.0] - 2026-02-07
 
 ### Added

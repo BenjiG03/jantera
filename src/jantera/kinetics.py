@@ -98,7 +98,7 @@ def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
     """
     # 1. Mixture properties
     from .thermo import compute_mixture_props
-    cp_mass, h_mass, rho = compute_mixture_props(T, P, Y, mech)
+    cp_mass, h_mass, rho, h_mol = compute_mixture_props(T, P, Y, mech)
     
     # 2. Concentrations [mol/m^3]
     conc = rho * Y / mech.mol_weights
@@ -108,21 +108,18 @@ def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
     kc = compute_Kc(T, mech)
     kr = kf / (kc + 1e-100)
     
-    # 4. Rates of progress
+    # 4. Rates of progress [log-space for efficient AD]
     safe_conc = jnp.maximum(conc, 1e-30)
+    log_conc = jnp.log(safe_conc)
     
-    if use_experimental_sparse:
-        # Experimental Sparse Path for ROP
-        # f_rop = kf * exp(sum(nu * log(conc)))
-        log_conc = jnp.log(safe_conc)
-        f_rop = kf * jnp.exp(mech.reactant_stoich_sparse @ log_conc)
-        r_rop = kr * jnp.exp(mech.product_stoich_sparse @ log_conc)
-    else:
-        padded_conc = jnp.concatenate([safe_conc, jnp.array([1.0])]) # Pad with 1.0 for products in power
-        reac_conc = padded_conc[mech.reactants_idx]
-        f_rop = kf * jnp.prod(jnp.power(reac_conc, mech.reactants_nu), axis=1)
-        prod_conc = padded_conc[mech.products_idx]
-        r_rop = kr * jnp.prod(jnp.power(prod_conc, mech.products_nu), axis=1)
+    # Pad log_conc with 0 for dummy indices (log(1.0) = 0)
+    padded_log_conc = jnp.concatenate([log_conc, jnp.array([0.0])])
+    
+    # f_rop = kf * exp(sum(nu * log(conc)))
+    f_rop = kf * jnp.exp(jnp.sum(mech.reactants_nu * padded_log_conc[mech.reactants_idx], axis=1))
+    
+    # r_rop = kr * exp(sum(nu * log(conc)))
+    r_rop = kr * jnp.exp(jnp.sum(mech.products_nu * padded_log_conc[mech.products_idx], axis=1))
     
     r_rop = jnp.where(mech.is_reversible, r_rop, 0.0)
     rop = f_rop - r_rop
@@ -149,4 +146,4 @@ def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
         wdot_reac = scatter_stoich(mech.reactants_idx, mech.reactants_nu, rop, mech.n_species)
         wdot = wdot_prod - wdot_reac
         
-    return wdot, h_mass, cp_mass, rho
+    return wdot, h_mass, cp_mass, rho, h_mol

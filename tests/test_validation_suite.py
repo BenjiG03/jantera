@@ -71,7 +71,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
         sol_jt.TP = t, p
         sol_ct.TP = t, p
         
-        w_jt, _, c_jt, _ = compute_wdot(sol_jt.T, sol_jt.P, sol_jt.Y, mech_jt)
+        w_jt, _, c_jt, _, _ = compute_wdot(sol_jt.T, sol_jt.P, sol_jt.Y, mech_jt)
         cp_jt_list.append(c_jt)
         wdot_jt_max_list.append(np.max(np.abs(w_jt)))
         
@@ -103,7 +103,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     # Re-set to initial for error metrics
     sol_ct.TPX = T0, P0, X0_str
     sol_jt.TPX = T0, P0, X0_str
-    wdot_jt, h_jt, cp_jt, rho_jt = compute_wdot(sol_jt.T, sol_jt.P, sol_jt.Y, mech_jt)
+    wdot_jt, h_jt, cp_jt, rho_jt, _ = compute_wdot(sol_jt.T, sol_jt.P, sol_jt.Y, mech_jt)
     wdot_ct = sol_ct.net_production_rates
     
     err_wdot = np.max(np.abs(wdot_jt - wdot_ct) / (np.max(np.abs(wdot_ct)) + 1e-10))

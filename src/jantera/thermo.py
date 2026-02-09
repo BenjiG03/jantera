@@ -103,4 +103,4 @@ def compute_mixture_props(T, P, Y, mech):
     # rho = P * mw_mix / (R_gas * T)
     rho = P * mw_mix / (R_GAS * T)
     
-    return cp_mass, h_mass, rho
+    return cp_mass, h_mass, rho, h_mol

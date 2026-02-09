@@ -104,7 +104,7 @@ Implements reaction rate calculations.
 ### Main Function
 
 ```python
-def compute_wdot(T, P, Y, mech) -> (wdot, h_mass, cp_mass, rho)
+def compute_wdot(T, P, Y, mech) -> (wdot, h_mass, cp_mass, rho, h_mol)
 ```
 
 Returns:
@@ -112,6 +112,7 @@ Returns:
 - `h_mass`: Mixture enthalpy [J/kg]
 - `cp_mass`: Mixture heat capacity [J/kg/K]
 - `rho`: Density [kg/m³]
+- `h_mol`: Species enthalpies [J/kmol] (optimization artifact)
 
 ### Rate Calculation Steps
 

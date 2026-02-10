@@ -20,4 +20,4 @@ $$ \frac{S}{R} = a_0 \ln T + a_1 T + \frac{a_2 T^2}{2} + \frac{a_3 T^3}{3} + \fr
 Temperature range switching ($T < T_{mid}$ vs $T > T_{mid}$) is handled via `jnp.where` masking to maintain JIT compatibility without control flow divergence.
 
 ### Source Code
-- [src/jantera/thermo.py](../../src/jantera/thermo.py)
+- [src/canterax/thermo.py](../../src/canterax/thermo.py)

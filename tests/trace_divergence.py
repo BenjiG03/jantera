@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 
 def trace_divergence():
     yaml_path = "gri30.yaml"
@@ -30,7 +30,7 @@ def trace_divergence():
     
     net = ReactorNet(mech)
     
-    # Jantera trajectory
+    # Canterax trajectory
     ts = jnp.linspace(0, t_end, n_points)
     saveat = SaveAt(ts=ts)
     res = net.advance(T0, P0, Y0, t_end, rtol=1e-10, atol=1e-14, solver=Kvaerno5(), saveat=saveat)
@@ -55,7 +55,7 @@ def trace_divergence():
     # Calculate divergence
     dT = jt_T - ct_T
     
-    print("Time (us)  | T_Jantera | T_Cantera | dT (K)")
+    print("Time (us)  | T_Canterax | T_Cantera | dT (K)")
     print("-" * 50)
     for i in range(0, len(ts), 5):
         print(f"{ts[i]*1e6:8.2f}   | {jt_T[i]:9.2f} | {ct_T[i]:9.2f} | {dT[i]:+8.4f}")
@@ -71,7 +71,7 @@ def trace_divergence():
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     
     axes[0].plot(ct_ts*1e6, ct_T, 'k-', lw=2, label='Cantera')
-    axes[0].plot(jt_ts*1e6, jt_T, 'r--', lw=2, label='Jantera')
+    axes[0].plot(jt_ts*1e6, jt_T, 'r--', lw=2, label='Canterax')
     axes[0].set_xlabel('Time (us)')
     axes[0].set_ylabel('Temperature (K)')
     axes[0].set_title('GRI-30 Trajectory')

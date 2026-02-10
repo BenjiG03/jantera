@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jantera"
-version = "0.2.0"
+name = "canterax"
+version = "0.3.0"
 description = "A differentiable, GPU-resident chemical kinetics library using JAX"
 readme = "README.md"
 requires-python = ">=3.9"

@@ -1,5 +1,5 @@
 """
-Refined gradient test with Jantera AD, Jantera FD, and Cantera FD.
+Refined gradient test with Canterax AD, Canterax FD, and Cantera FD.
 Isolates the factor of 2 discrepancy.
 """
 import os
@@ -14,10 +14,10 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import reactor_rhs
-from jantera.kinetics import compute_wdot
-from jantera.thermo import compute_mixture_props
+from canterax.loader import load_mechanism
+from canterax.reactor import reactor_rhs
+from canterax.kinetics import compute_wdot
+from canterax.thermo import compute_mixture_props
 
 def compare_gradients_triple():
     yaml_path = "gri30.yaml"
@@ -41,11 +41,11 @@ def compare_gradients_triple():
         _, _, rho = compute_mixture_props(T0, P0, Y, mech)
         return rho * Y[h2_idx] / mech.mol_weights[h2_idx]
     
-    # 1. Jantera AD
+    # 1. Canterax AD
     grad_ad = jax.grad(get_conc_h2)(jnp.array(Y0))
     jt_ad = float(grad_ad[h2_idx] - grad_ad[n2_idx])
     
-    # 2. Jantera FD
+    # 2. Canterax FD
     Y_p = Y0.copy(); Y_p[h2_idx] += eps; Y_p[n2_idx] -= eps
     c_p = float(get_conc_h2(jnp.array(Y_p)))
     Y_m = Y0.copy(); Y_m[h2_idx] -= eps; Y_m[n2_idx] += eps
@@ -59,7 +59,7 @@ def compare_gradients_triple():
     ct_m = sol_ct.concentrations[h2_idx]
     ct_fd = (ct_p - ct_m) / (2 * eps)
     
-    print(f"Jantera Params:")
+    print(f"Canterax Params:")
     print(f"  c_p: {c_p:.10e}")
     print(f"  c_m: {c_m:.10e}")
     print(f"  delta_c: {c_p - c_m:.6e}")
@@ -76,11 +76,11 @@ def compare_gradients_triple():
         state = jnp.concatenate([jnp.array([T0]), Y])
         return reactor_rhs(0.0, state, (P0, mech))[0]
     
-    # 1. Jantera AD
+    # 1. Canterax AD
     grad_ad_dT = jax.grad(get_dTdt)(jnp.array(Y0))
     jt_ad_dT = float(grad_ad_dT[h2_idx] - grad_ad_dT[n2_idx])
     
-    # 2. Jantera FD
+    # 2. Canterax FD
     c_p_dT = float(get_dTdt(jnp.array(Y_p)))
     c_m_dT = float(get_dTdt(jnp.array(Y_m)))
     jt_fd_dT = (c_p_dT - c_m_dT) / (2 * eps)
@@ -97,8 +97,8 @@ def compare_gradients_triple():
     ct_fd_dT = (ct_p_dT - ct_m_dT) / (2 * eps)
     
     print(f"\nSummary for d(dTdt)/dY_H2:")
-    print(f"  Jantera AD: {jt_ad_dT:.8e}")
-    print(f"  Jantera FD: {jt_fd_dT:.8e}")
+    print(f"  Canterax AD: {jt_ad_dT:.8e}")
+    print(f"  Canterax FD: {jt_fd_dT:.8e}")
     print(f"  Cantera FD: {ct_fd_dT:.8e}")
     print(f"  Ratio AD/FD: {jt_ad_dT/jt_fd_dT:.6f}")
     print(f"  Ratio JT/CT: {jt_fd_dT/ct_fd_dT:.6f}")

@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from jantera.solvers.bdf import bdf_solve
+from canterax.solvers.bdf import bdf_solve
 import sys
 import os
 

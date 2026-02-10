@@ -4,7 +4,7 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
+from canterax.loader import load_mechanism
 import cantera as ct
 import jax
 jax.config.update("jax_enable_x64", True)

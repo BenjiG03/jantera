@@ -22,7 +22,7 @@ Optimization within Python/JAX can yield at most a ~2-3x speedup by reducing the
 ## Analysis
 The BDF solver logic (state management, error checking, step resizing) adds ~17 µs of overhead on top of the pure loop overhead (12 µs). This total ~30 µs overhead dominates when the mathematical workload (small matrix solve, small kinetics kernel) is highly optimized.
 
-Even if we completely eliminate the cost of chemical kinetics and linear algebra (0 µs), Jantera would still be ~4x slower than Cantera on a single CPU core.
+Even if we completely eliminate the cost of chemical kinetics and linear algebra (0 µs), Canterax would still be ~4x slower than Cantera on a single CPU core.
 
 ## Recommendations
 1.  **Do Not Optimize Python Further for Single-Core Speed**: Further Python-level optimizations (e.g., fusing ops) will have diminishing returns and cannot overcome the 30 µs floor.

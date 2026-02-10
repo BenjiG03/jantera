@@ -11,10 +11,10 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.solution import Solution
-from jantera.reactor import ReactorNet
-from jantera.solvers.bdf import bdf_solve
+from canterax.loader import load_mechanism
+from canterax.solution import Solution
+from canterax.reactor import ReactorNet
+from canterax.solvers.bdf import bdf_solve
 
 def debug_jp10():
     print("Loading JP-10...")

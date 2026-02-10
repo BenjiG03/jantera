@@ -12,8 +12,8 @@ from diffrax import SaveAt, Kvaerno5
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_wdot
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_wdot
 
 def compare_wdot_at_t():
     yaml_path = "gri30.yaml"
@@ -37,7 +37,7 @@ def compare_wdot_at_t():
     print(f"Comparing wdot at T={T:.2f}K (t={t_compare*1e6:.1f}us)")
     print("=" * 70)
     
-    # Jantera wdot
+    # Canterax wdot
     wdot_jt, h_jt, cp_jt, rho_jt = compute_wdot(T, P0, Y, mech)
     wdot_jt = np.array(wdot_jt)
     

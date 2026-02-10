@@ -18,4 +18,4 @@ The solver uses element potentials ($\lambda_j$) as the primary variables. The n
 Validated against Cantera's `equilibrate` function for GRI-30 and JP-10 mechanisms, achieving parity with robust convergence.
 
 ### Source Code
-- [src/jantera/equilibrate.py](../../src/jantera/equilibrate.py)
+- [src/canterax/equilibrate.py](../../src/canterax/equilibrate.py)

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Jantera is designed around three core principles:
+Canterax is designed around three core principles:
 
 1. **Pure Functions**: All computational kernels are stateless JAX-traced functions
 2. **Immutable Data Structures**: Mechanism data is stored in Equinox modules

@@ -9,9 +9,9 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
-from jantera.solution import Solution
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
+from canterax.solution import Solution
 
 jax.config.update("jax_enable_x64", True)
 
@@ -47,7 +47,7 @@ def profile_sensitivity(yaml_file, condition_name):
     def get_final_T(mech_curr):
         # Custom advance to test BacksolveAdjoint
         # We need to access reactor_rhs
-        from jantera.reactor import reactor_rhs
+        from canterax.reactor import reactor_rhs
         term = diffrax.ODETerm(reactor_rhs)
         
         y0 = jnp.concatenate([jnp.array([T0]), sol.Y])

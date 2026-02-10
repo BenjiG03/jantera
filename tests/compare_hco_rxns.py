@@ -11,8 +11,8 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_kf, compute_Kc
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_kf, compute_Kc
 
 def compare_hco_reactions():
     yaml_path = "gri30.yaml"
@@ -36,7 +36,7 @@ def compare_hco_reactions():
     print(f"Comparing HCO reactions at T={T:.2f}K")
     print("=" * 80)
     
-    # Jantera kf
+    # Canterax kf
     kf_jt = np.array(compute_kf(T, conc, mech))
     kc_jt = np.array(compute_Kc(T, mech))
     kr_jt = kf_jt / (kc_jt + 1e-100)
@@ -65,7 +65,7 @@ def compare_hco_reactions():
         rop_r_ct = sol_ct.reverse_rates_of_progress[i]
         rop_ct = rop_f_ct - rop_r_ct
         
-        # Jantera ROP manually
+        # Canterax ROP manually
         log_conc = jnp.log(jnp.maximum(conc, 1e-100))
         rop_f_jt = float(kf_jt[i] * jnp.exp(jnp.dot(mech.reactant_stoich[i], log_conc)))
         rop_r_jt = float(kr_jt[i] * jnp.exp(jnp.dot(mech.product_stoich[i], log_conc))) if mech.is_reversible[i] else 0.0

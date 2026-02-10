@@ -2,7 +2,7 @@
 
 ## Overview
 
-Jantera consists of 8 core modules:
+Canterax consists of 8 core modules:
 
 | Module | Purpose |
 |--------|---------|

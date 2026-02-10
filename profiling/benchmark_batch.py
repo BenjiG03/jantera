@@ -12,9 +12,9 @@ from tabulate import tabulate
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.solution import Solution
-from jantera.reactor import ReactorNet, reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.solution import Solution
+from canterax.reactor import ReactorNet, reactor_rhs
 
 jax.config.update("jax_enable_x64", True)
 

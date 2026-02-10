@@ -13,8 +13,8 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_wdot
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_wdot
 
 def check_jp10_nan():
     yaml_path = "jp10.yaml"

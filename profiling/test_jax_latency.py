@@ -10,9 +10,9 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.solvers.bdf import bdf_solve
-from jantera.kinetics import compute_wdot
-from jantera.loader import load_mechanism
+from canterax.solvers.bdf import bdf_solve
+from canterax.kinetics import compute_wdot
+from canterax.loader import load_mechanism
 
 jax.config.update("jax_enable_x64", True)
 

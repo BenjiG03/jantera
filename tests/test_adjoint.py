@@ -13,8 +13,8 @@ import diffrax
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.reactor import reactor_rhs
 
 
 def test_adjoint_overhead():

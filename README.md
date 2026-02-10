@@ -1,4 +1,4 @@
-# Jantera 🔥
+# Canterax 🔥
 
 <p align="center">
   <strong>A differentiable, GPU-resident chemical kinetics library using JAX</strong>
@@ -17,12 +17,12 @@
 
 ## Overview
 
-**Jantera** is a JAX-based reimplementation of core [Cantera](https://cantera.org/) functionality, designed for:
+**Canterax** is a JAX-based reimplementation of core [Cantera](https://cantera.org/) functionality, designed for:
 - **Automatic Differentiation**: Compute gradients through thermodynamics, kinetics, and ODE integrations using `jax.grad`.
 - **GPU Acceleration**: JAX's XLA backend enables massive parallelization on GPUs/TPUs.
 - **Batched Simulations**: Simulate thousands of reactors in parallel with `jax.vmap`.
 
-Jantera loads standard Cantera YAML mechanism files and provides a Pythonic, Cantera-like API.
+Canterax loads standard Cantera YAML mechanism files and provides a Pythonic, Cantera-like API.
 
 ---
 
@@ -51,8 +51,8 @@ Jantera loads standard Cantera YAML mechanism files and provides a Pythonic, Can
 
 ### From Source
 ```bash
-git clone https://github.com/BenjiG03/jantera.git
-cd jantera
+git clone https://github.com/BenjiG03/canterax.git
+cd canterax
 pip install -e .
 ```
 
@@ -71,7 +71,7 @@ Core dependencies are installed automatically:
 
 ### Basic Usage: Thermodynamic Properties
 ```python
-from jantera import Solution
+from canterax import Solution
 
 # Load a mechanism (uses Cantera's YAML format)
 gas = Solution("gri30.yaml")
@@ -87,8 +87,8 @@ print(f"Cp: {gas.cp_mass} J/kg/K")
 
 ### Reactor Simulation
 ```python
-from jantera import Solution, ReactorNet
-from jantera.loader import load_mechanism
+from canterax import Solution, ReactorNet
+from canterax.loader import load_mechanism
 
 mech = load_mechanism("gri30.yaml")
 gas = Solution("gri30.yaml")
@@ -102,8 +102,8 @@ print(f"Final Temperature: {result.ys[-1, 0]:.2f} K")
 
 ### Equilibrium Calculation
 ```python
-from jantera import Solution
-from jantera.equilibrate import equilibrate
+from canterax import Solution
+from canterax.equilibrate import equilibrate
 
 gas = Solution("gri30.yaml")
 gas.TPX = 2000.0, 101325.0, "CH4:1, O2:2, N2:7.52"
@@ -117,8 +117,8 @@ print(f"Major products: CO2={gas.Y[gas.species_index('CO2')]:.4f}")
 ### Gradient Computation (Automatic Differentiation)
 ```python
 import jax
-from jantera import Solution, ReactorNet
-from jantera.loader import load_mechanism
+from canterax import Solution, ReactorNet
+from canterax.loader import load_mechanism
 
 mech = load_mechanism("gri30.yaml")
 gas = Solution("gri30.yaml")
@@ -141,8 +141,8 @@ print(f"dT/dY_CH4 = {grad_Y[gas.species_index('CH4')]:.4e}")
 ## Architecture
 
 ```
-jantera/
-├── src/jantera/
+canterax/
+├── src/canterax/
 │   ├── constants.py      # Physical constants (R, etc.)
 │   ├── mech_data.py      # MechData: Equinox module holding mechanism arrays
 │   ├── loader.py         # YAML mechanism parser (wraps Cantera)
@@ -167,7 +167,7 @@ jantera/
 
 ## Validation
 
-Jantera has been rigorously validated against Cantera 3.2.0 using:
+Canterax has been rigorously validated against Cantera 3.2.0 using:
 - **GRI-30**: 53 species, 325 reactions (Methane)
 - **Z77 JP-10**: 31 species, 77 reactions (Jet fuel)
 
@@ -185,7 +185,7 @@ Jantera has been rigorously validated against Cantera 3.2.0 using:
 
 Benchmarks run on basic CPU hardware.
 
-| Phase | Metric | Jantera (GRI) | Cantera (GRI)* | Jantera (JP-10) | Cantera (JP-10)* |
+| Phase | Metric | Canterax (GRI) | Cantera (GRI)* | Canterax (JP-10) | Cantera (JP-10)* |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Equil** | Warm Time | 278 ms | <1 ms | 1784 ms | <1 ms |
 | **Equil** | Steps | 33 | - | 536 | - |
@@ -196,9 +196,9 @@ Benchmarks run on basic CPU hardware.
 \* Cantera step counts are internal solver steps, not fully exposed in all versions.
 
 #### Key Insights
-1.  **Sensitivity Analysis**: Jantera is **10x faster** than Cantera's native sensitivity solver for GRI-30 (32ms vs ~360ms). The log-space ROP optimization significantly accelerated the Jacobian-vector products required for forward-mode AD.
-2.  **Reactor Advancement**: Jantera is now within **~5-8x** of Cantera's optimized C++ solver for reactor trajectories. The Kvaerno5 solver with explicit LU decomposition and Jacobian reuse (`kappa=0.5`) reduced runtime by nearly 50% compared to previous baselines.
-3.  **Sparsity Handling**: Jantera uses a "dense-sparse" approach, leveraging JAX's `scatter` and `gather` (indirect addressing) to strictly avoid dense matrix multiplications for stoichiometry. This ensures linear scaling with mechanism size without the overhead of full sparse matrix primitives (experimental `BCOO` support is available).
+1.  **Sensitivity Analysis**: Canterax is **10x faster** than Cantera's native sensitivity solver for GRI-30 (32ms vs ~360ms). The log-space ROP optimization significantly accelerated the Jacobian-vector products required for forward-mode AD.
+2.  **Reactor Advancement**: Canterax is now within **~5-8x** of Cantera's optimized C++ solver for reactor trajectories. The Kvaerno5 solver with explicit LU decomposition and Jacobian reuse (`kappa=0.5`) reduced runtime by nearly 50% compared to previous baselines.
+3.  **Sparsity Handling**: Canterax uses a "dense-sparse" approach, leveraging JAX's `scatter` and `gather` (indirect addressing) to strictly avoid dense matrix multiplications for stoichiometry. This ensures linear scaling with mechanism size without the overhead of full sparse matrix primitives (experimental `BCOO` support is available).
 
 
 ### Known Limitations

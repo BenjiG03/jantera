@@ -11,8 +11,8 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_wdot, compute_Kc
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_wdot, compute_Kc
 
 
 def compare_rhs():
@@ -33,7 +33,7 @@ def compare_rhs():
     ch4_idx = sol_ct.species_index('CH4')
     print(f"  MW:  JT={float(mech.mol_weights[ch4_idx]):.4f}, CT={sol_ct.molecular_weights[ch4_idx]:.4f}")
     
-    # Jantera
+    # Canterax
     wdot_jt, h_mass_jt, cp_mass_jt, rho_jt = compute_wdot(T0, P0, Y0, mech)
     
     # Cantera
@@ -85,8 +85,8 @@ def compare_rhs():
         print(f"    {sol_ct.species_name(i):10s}: CT={dYdt_ct[i]:+.4e}, JT={dYdt_jt[i]:+.4e}, diff={abs(dYdt_jt[i]-dYdt_ct[i]):.2e}")
 
     # Compute dT/dt
-    from jantera.thermo import get_h_RT
-    from jantera.constants import R_GAS
+    from canterax.thermo import get_h_RT
+    from canterax.constants import R_GAS
     
     h_RT = get_h_RT(T0, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
     h_mol_jt = np.array(h_RT) * R_GAS * T0
@@ -99,7 +99,7 @@ def compare_rhs():
     dTdt_ct = -energy_term_ct / (rho_ct * cp_mass_ct)
     
     print(f"\n--- Temperature Rate (dT/dt) ---")
-    print(f"  Jantera:  {dTdt_jt:+.4e} K/s")
+    print(f"  Canterax:  {dTdt_jt:+.4e} K/s")
     print(f"  Cantera:  {dTdt_ct:+.4e} K/s")
     print(f"  Diff:     {abs(dTdt_jt - dTdt_ct):.2e} K/s ({100*abs(dTdt_jt - dTdt_ct)/abs(dTdt_ct):.2f}%)")
 

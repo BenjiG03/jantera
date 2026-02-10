@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.thermo import compute_mixture_props
+from canterax.loader import load_mechanism
+from canterax.thermo import compute_mixture_props
 
 def test_thermo():
     yaml_path = "gri30.yaml"
@@ -27,9 +27,9 @@ def test_thermo():
     # Random mole fractions
     X_samples = np.random.dirichlet(np.ones(mech.n_species), n_points)
     
-    cp_jantera = []
-    h_jantera = []
-    rho_jantera = []
+    cp_canterax = []
+    h_canterax = []
+    rho_canterax = []
     
     cp_cantera = []
     h_cantera = []
@@ -46,16 +46,16 @@ def test_thermo():
         h_cantera.append(sol.enthalpy_mass)
         rho_cantera.append(sol.density)
         
-        # Jantera
+        # Canterax
         Y = jnp.array(sol.Y)
         cp, h, rho = compute_mixture_props(T, P, Y, mech)
-        cp_jantera.append(float(cp))
-        h_jantera.append(float(h))
-        rho_jantera.append(float(rho))
+        cp_canterax.append(float(cp))
+        h_canterax.append(float(h))
+        rho_canterax.append(float(rho))
         
-    cp_jantera = np.array(cp_jantera)
-    h_jantera = np.array(h_jantera)
-    rho_jantera = np.array(rho_jantera)
+    cp_canterax = np.array(cp_canterax)
+    h_canterax = np.array(h_canterax)
+    rho_canterax = np.array(rho_canterax)
     
     cp_cantera = np.array(cp_cantera)
     h_cantera = np.array(h_cantera)
@@ -70,9 +70,9 @@ def test_thermo():
         rel_err = abs_err / (np.abs(ref) + 1e-15)
         return np.max(rel_err)
 
-    cp_err = get_max_rel_error(cp_jantera, cp_cantera)
-    h_err = np.max(np.abs(h_jantera - h_cantera)) / (np.max(np.abs(h_cantera)) + 1e-15)
-    rho_err = get_max_rel_error(rho_jantera, rho_cantera)
+    cp_err = get_max_rel_error(cp_canterax, cp_cantera)
+    h_err = np.max(np.abs(h_canterax - h_cantera)) / (np.max(np.abs(h_cantera)) + 1e-15)
+    rho_err = get_max_rel_error(rho_canterax, rho_cantera)
     
     print(f"Max relative errors:")
     print(f"  Cp_mass: {cp_err:.2e}")
@@ -84,25 +84,25 @@ def test_thermo():
     plt.figure(figsize=(15, 5))
     
     plt.subplot(1, 3, 1)
-    plt.scatter(cp_cantera, cp_jantera, alpha=0.5)
+    plt.scatter(cp_cantera, cp_canterax, alpha=0.5)
     plt.plot([min(cp_cantera), max(cp_cantera)], [min(cp_cantera), max(cp_cantera)], 'r--')
     plt.title("Cp_mass [J/kg/K]")
     plt.xlabel("Cantera")
-    plt.ylabel("Jantera")
+    plt.ylabel("Canterax")
     
     plt.subplot(1, 3, 2)
-    plt.scatter(h_cantera, h_jantera, alpha=0.5)
+    plt.scatter(h_cantera, h_canterax, alpha=0.5)
     plt.plot([min(h_cantera), max(h_cantera)], [min(h_cantera), max(h_cantera)], 'r--')
     plt.title("Enthalpy [J/kg]")
     plt.xlabel("Cantera")
-    plt.ylabel("Jantera")
+    plt.ylabel("Canterax")
     
     plt.subplot(1, 3, 3)
-    plt.scatter(rho_cantera, rho_jantera, alpha=0.5)
+    plt.scatter(rho_cantera, rho_canterax, alpha=0.5)
     plt.plot([min(rho_cantera), max(rho_cantera)], [min(rho_cantera), max(rho_cantera)], 'r--')
     plt.title("Density [kg/m3]")
     plt.xlabel("Cantera")
-    plt.ylabel("Jantera")
+    plt.ylabel("Canterax")
     
     plt.tight_layout()
     plt.savefig("tests/outputs/thermo_validation.png")

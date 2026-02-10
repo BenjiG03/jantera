@@ -1,5 +1,5 @@
 """
-Profile Jantera reactor performance to identify bottlenecks.
+Profile Canterax reactor performance to identify bottlenecks.
 """
 import os
 import sys
@@ -12,8 +12,8 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 from diffrax import Kvaerno5, SaveAt
 
 

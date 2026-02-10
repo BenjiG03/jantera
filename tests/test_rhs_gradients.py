@@ -13,8 +13,8 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.reactor import reactor_rhs
 
 def compare_rhs_gradients():
     yaml_path = "gri30.yaml"
@@ -83,7 +83,7 @@ def compare_rhs_gradients():
         rel_diff = abs_diff / (max(abs(val_ct), 1e-10))
         table_rows.append([sp_name, f"{val_jt:+.4e}", f"{val_ct:+.4e}", f"{abs_diff:.2e}", f"{rel_diff*100:.4f}%"])
         
-    print(tabulate(table_rows, headers=["Species", "Jantera (AD)", "Cantera (FD)", "Abs Diff", "Rel Diff"], tablefmt="grid"))
+    print(tabulate(table_rows, headers=["Species", "Canterax (AD)", "Cantera (FD)", "Abs Diff", "Rel Diff"], tablefmt="grid"))
 
 if __name__ == "__main__":
     compare_rhs_gradients()

@@ -1,0 +1,7 @@
+include jp10.yaml
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+recursive-include src/canterax *.yaml *.cti
+recursive-include tests *.py *.yaml

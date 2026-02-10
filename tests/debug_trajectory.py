@@ -13,8 +13,8 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 
 def debug_trajectory():
     yaml_path = "gri30.yaml"
@@ -44,7 +44,7 @@ def debug_trajectory():
     jax.block_until_ready(res)
     elapsed = time.perf_counter() - start
     
-    print(f"\n--- Jantera Results ---")
+    print(f"\n--- Canterax Results ---")
     print(f"  Execution Time: {elapsed*1000:.2f} ms")
     print(f"  T_final: {float(res.ys[-1, 0]):.4f} K")
     if hasattr(res, 'stats'):

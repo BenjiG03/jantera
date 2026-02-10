@@ -1,5 +1,5 @@
 """
-Micro-benchmark for Jantera components to isolate performance bottlenecks.
+Micro-benchmark for Canterax components to isolate performance bottlenecks.
 Tests individual functions without running the full ODE solver.
 """
 import os
@@ -13,10 +13,10 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_wdot, compute_kf, compute_Kc
-from jantera.thermo import compute_mixture_props
-from jantera.reactor import reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_wdot, compute_kf, compute_Kc
+from canterax.thermo import compute_mixture_props
+from canterax.reactor import reactor_rhs
 
 
 def benchmark_function(func, args, name, n_warmup=3, n_runs=100):

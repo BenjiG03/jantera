@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-02-09
+
+### Major Changes ⚠️
+- **Rename**: Renamed project from `jantera` to `canterax`. Updated all import paths and package structure.
+- **Validation**: Expanded validation suite with Ethane, Propane, and Hydrogen mechanisms.
+- **Testing**: Added broader temperature and pressure ranges for static validation parity checks.
+
 ## [0.2.0] - 2026-02-08
 
 ### Performance 🚀

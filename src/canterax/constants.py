@@ -1,7 +1,7 @@
-"""Physical constants for Jantera."""
+"""Physical constants for Canterax."""
 
 # Universal gas constant in J/(kmol·K)
-# Cantera uses 8314.46 J/kmol·K. Jantera now matches this.
+# Cantera uses 8314.46 J/kmol·K. Canterax now matches this.
 R_GAS = 8314.462618
 
 # One atmosphere in Pascals

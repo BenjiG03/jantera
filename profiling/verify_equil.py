@@ -7,22 +7,22 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.solution import Solution as JanteraSolution
-from jantera.equilibrate import equilibrate
+from canterax.loader import load_mechanism
+from canterax.solution import Solution as CanteraxSolution
+from canterax.equilibrate import equilibrate
 
 def test_equil_robustness():
     jax.config.update("jax_enable_x64", True)
     
     yaml_path = "gri30.yaml"
-    sol = JanteraSolution(yaml_path)
+    sol = CanteraxSolution(yaml_path)
     
     T, P = 1500.0, 101325.0
     X = "CH4:1, O2:2, N2:7.52"
     
     sol.TPX = T, P, X
     
-    print("Running Jantera Equilibrate (Basis Optimized)...")
+    print("Running Canterax Equilibrate (Basis Optimized)...")
     t0 = time.perf_counter()
     res = equilibrate(sol, rtol=1e-12)
     jax.block_until_ready(sol.Y)

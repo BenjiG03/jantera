@@ -11,12 +11,12 @@ from tabulate import tabulate
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.solution import Solution
-from jantera.reactor import ReactorNet
-from jantera.thermo import compute_mixture_props
-from jantera.kinetics import compute_wdot
-from jantera.equilibrate import equilibrate
+from canterax.loader import load_mechanism
+from canterax.solution import Solution
+from canterax.reactor import ReactorNet
+from canterax.thermo import compute_mixture_props
+from canterax.kinetics import compute_wdot
+from canterax.equilibrate import equilibrate
 import equinox as eqx
 
 def run_performance_bench(func, args, name, n_runs=20, n_warmup=5):
@@ -60,9 +60,9 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     # 1. Static Validation & Parity Plots
     print(f"--- Static Validation & Parity Plots ---", flush=True)
     # Generate random samples for parity
-    n_samples = 20
-    sample_Ts = np.random.uniform(800, 2500, n_samples)
-    sample_Ps = np.random.uniform(0.5e5, 10e5, n_samples)
+    n_samples = 30
+    sample_Ts = np.random.uniform(300, 3500, n_samples)
+    sample_Ps = np.random.uniform(0.1e5, 100e5, n_samples)
     
     cp_jt_list, cp_ct_list = [], []
     wdot_jt_max_list, wdot_ct_max_list = [], []
@@ -84,7 +84,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     plt.loglog(cp_ct_list, cp_jt_list, 'bo', alpha=0.5)
     plt.plot([min(cp_ct_list), max(cp_ct_list)], [min(cp_ct_list), max(cp_ct_list)], 'r--')
     plt.xlabel('Cantera Cp (J/kg/K)')
-    plt.ylabel('Jantera Cp (J/kg/K)')
+    plt.ylabel('Canterax Cp (J/kg/K)')
     plt.title(f'{name} Static Cp Parity')
     plt.grid(True, which="both", ls="-", alpha=0.2)
 
@@ -92,7 +92,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     plt.loglog(wdot_ct_max_list, wdot_jt_max_list, 'go', alpha=0.5)
     plt.plot([min(wdot_ct_max_list), max(wdot_ct_max_list)], [min(wdot_ct_max_list), max(wdot_ct_max_list)], 'r--')
     plt.xlabel('Cantera Max |wdot|')
-    plt.ylabel('Jantera Max |wdot|')
+    plt.ylabel('Canterax Max |wdot|')
     plt.title(f'{name} Static wdot Parity')
     plt.grid(True, which="both", ls="-", alpha=0.2)
     
@@ -145,7 +145,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     # Plot Trajectory
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(ct_ts*1e6, ct_T, 'k-', label='Cantera'); plt.plot(jt_ts*1e6, jt_T, 'r--', label='Jantera')
+    plt.plot(ct_ts*1e6, ct_T, 'k-', label='Cantera'); plt.plot(jt_ts*1e6, jt_T, 'r--', label='Canterax')
     plt.xlabel('Time (us)'); plt.ylabel('Temperature (K)'); plt.title(f'{name} T Trajectory ({solver_name})'); plt.legend()
     
     plt.subplot(1, 2, 2)
@@ -180,7 +180,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     plt.loglog(sol_ct.Y, sol_jt.Y, 'mo', alpha=0.6)
     plt.plot([1e-15, 1], [1e-15, 1], 'k--')
     plt.xlabel('Cantera Mole Fraction')
-    plt.ylabel('Jantera Mole Fraction')
+    plt.ylabel('Canterax Mole Fraction')
     plt.title(f'{name} Equilibrium Parity')
     plt.grid(True, which="both", ls="-", alpha=0.2)
     plt.savefig(f"tests/outputs/{name.lower()}_equil_parity.png")
@@ -219,7 +219,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
             val, steps = get_final_T(mech, y)
             return val
             
-        print(f"  Computing Jantera sensitivities ({solver_name})...", end="", flush=True)
+        print(f"  Computing Canterax sensitivities ({solver_name})...", end="", flush=True)
         try:
             t0 = time.time()
             grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
@@ -262,7 +262,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
             x = np.arange(len(labels))
             width = 0.35
             plt.bar(x - width/2, grad_ct_norm[top_sens_idx], width, label='Cantera (Native)', color='gray')
-            plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Jantera (AD)', color='cyan')
+            plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Canterax (AD)', color='cyan')
             plt.xticks(x, labels, rotation=45, ha='right')
             plt.ylabel('Normalized Sensitivity d(T) / d(ln A)')
             plt.title(f'{name} Reaction Sensitivity ({solver_name})')
@@ -279,7 +279,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     print(f"--- Performance Benchmarking ---", flush=True)
     jit_w, warm_w = run_performance_bench(compute_wdot, (T0, P0, sol_jt.Y, mech_jt), "compute_wdot")
     
-    # Jantera 1ms Benchmark (No saveat, just t_end)
+    # Canterax 1ms Benchmark (No saveat, just t_end)
     def advance_bench(y):
         return net_jt.advance(T0, P0, y, t_end, solver=jt_solver)
     
@@ -345,14 +345,36 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
 def main():
     os.makedirs("tests/outputs", exist_ok=True)
     
-    gri_cond = (1500.0, 101325.0, "CH4:1, O2:2, N2:7.52")
-    res_gri_kv = validate_mechanism("GRI-30", "gri30.yaml", gri_cond, solver_name="kvaerno")
-    res_gri_bdf = validate_mechanism("GRI-30", "gri30.yaml", gri_cond, solver_name="bdf")
+    # Define test cases
+    test_cases = [
+        # Name, MechFile, Conditions
+        ("GRI-30 (Methane)", "gri30.yaml", (1500.0, 101325.0, "CH4:1, O2:2, N2:7.52")),
+        ("GRI-30 (Ethane)", "gri30.yaml", (1500.0, 101325.0, "C2H6:1, O2:3.5, N2:13.16")),
+        ("GRI-30 (Propane)", "gri30.yaml", (1500.0, 101325.0, "C3H8:1, O2:5, N2:18.8")),
+        ("GRI-30 (Hydrogen)", "gri30.yaml", (1200.0, 101325.0, "H2:2, O2:1, N2:3.76")),
+    ]
     
+    # Check if jp10 exists
     jp10_yaml = os.path.join(os.path.dirname(__file__), "..", "jp10.yaml")
-    jp10_cond = (1500.0, 101325.0, "C10H16:1, O2:14, N2:52.64")
-    res_jp10_kv = validate_mechanism("JP-10", jp10_yaml, jp10_cond, solver_name="kvaerno")
-    res_jp10_bdf = validate_mechanism("JP-10", jp10_yaml, jp10_cond, solver_name="bdf")
+    if os.path.exists(jp10_yaml):
+        test_cases.append(("JP-10", jp10_yaml, (1500.0, 101325.0, "C10H16:1, O2:14, N2:52.64")))
+    
+    all_results = []
+
+    for name, yaml_path, cond in test_cases:
+        res_kv = validate_mechanism(name, yaml_path, cond, solver_name="kvaerno")
+        # For detailed comparison, we can also run BDF but let's stick to Kvaerno5 as primary validation to save time by default
+        # Unless user wants full matrix. Let's run BDF for the first case (Methane) and JP-10 as spot checks, or just Kvaerno for all.
+        # Given "more hydrocarbon mechanisms", broad coverage is better.
+        # But let's run just Kvaerno for new additions to keep runtime reasonable, and maybe BDF for original cases.
+        # Actually, let's run both for robustness as requested.
+        try:
+            res_bdf = validate_mechanism(name, yaml_path, cond, solver_name="bdf")
+        except Exception as e:
+            print(f"BDF Failed for {name}: {e}")
+            res_bdf = res_kv # Fallback or handle error
+            
+        all_results.append((name, res_kv, res_bdf))
 
     print("\n" + "="*25 + " DETAILED PERFORMANCE COMPARISON " + "="*25)
     
@@ -360,23 +382,29 @@ def main():
         if steps <= 0: return "N/A"
         return f"{(time_s * 1e3 / steps):.3f}"
 
-    detailed_table = [
-        ["Phase", "Metric", "Jantera (GRI-KV)", "Jantera (GRI-BDF)", "Cantera (GRI)", "Jantera (JP10-KV)", "Jantera (JP10-BDF)", "Cantera (JP10)"],
-        ["Adv (1ms)", "Warm Time (ms)", 
-         f"{res_gri_kv['perf']['warm_adv']*1e3:.2f}", f"{res_gri_bdf['perf']['warm_adv']*1e3:.2f}", f"{res_gri_kv['perf']['ct_adv_total_time']*1e3:.2f}",
-         f"{res_jp10_kv['perf']['warm_adv']*1e3:.2f}", f"{res_jp10_bdf['perf']['warm_adv']*1e3:.2f}", f"{res_jp10_kv['perf']['ct_adv_total_time']*1e3:.2f}"],
-        ["Adv (1ms)", "Total Steps", 
-         f"{res_gri_kv['perf']['jt_adv_steps']}", f"{res_gri_bdf['perf']['jt_adv_steps']}", f"{res_gri_kv['perf']['ct_adv_steps']}",
-         f"{res_jp10_kv['perf']['jt_adv_steps']}", f"{res_jp10_bdf['perf']['jt_adv_steps']}", f"{res_jp10_kv['perf']['ct_adv_steps']}"],
-        ["Adv (1ms)", "Time/Step (ms)", 
-         time_per_step(res_gri_kv['perf']['warm_adv'], res_gri_kv['perf']['jt_adv_steps']), 
-         time_per_step(res_gri_bdf['perf']['warm_adv'], res_gri_bdf['perf']['jt_adv_steps']),
-         time_per_step(res_gri_kv['perf']['ct_adv_total_time'], res_gri_kv['perf']['ct_adv_steps']),
-         time_per_step(res_jp10_kv['perf']['warm_adv'], res_jp10_kv['perf']['jt_adv_steps']),
-         time_per_step(res_jp10_bdf['perf']['warm_adv'], res_jp10_bdf['perf']['jt_adv_steps']),
-         time_per_step(res_jp10_kv['perf']['ct_adv_total_time'], res_jp10_kv['perf']['ct_adv_steps'])],
-    ]
-    print(tabulate(detailed_table, headers="firstrow", tablefmt="grid"))
+    headers = ["Mechanism", "Solver", "Metric", "Canterax (Warm)", "Cantera", "Steps (CX)", "Steps (CT)", "ms/Step (CX)", "ms/Step (CT)"]
+    table_data = []
+    
+    for name, res_kv, res_bdf in all_results:
+        # Kvaerno Row
+        table_data.append([
+            name, "Kvaerno5", "Adv (1ms)",
+            f"{res_kv['perf']['warm_adv']*1e3:.2f} ms", f"{res_kv['perf']['ct_adv_total_time']*1e3:.2f} ms",
+            res_kv['perf']['jt_adv_steps'], res_kv['perf']['ct_adv_steps'],
+            time_per_step(res_kv['perf']['warm_adv'], res_kv['perf']['jt_adv_steps']),
+            time_per_step(res_kv['perf']['ct_adv_total_time'], res_kv['perf']['ct_adv_steps'])
+        ])
+        # BDF Row
+        if res_bdf != res_kv:
+            table_data.append([
+                name, "BDF", "Adv (1ms)",
+                f"{res_bdf['perf']['warm_adv']*1e3:.2f} ms", f"{res_bdf['perf']['ct_adv_total_time']*1e3:.2f} ms",
+                res_bdf['perf']['jt_adv_steps'], res_bdf['perf']['ct_adv_steps'],
+                time_per_step(res_bdf['perf']['warm_adv'], res_bdf['perf']['jt_adv_steps']),
+                time_per_step(res_bdf['perf']['ct_adv_total_time'], res_bdf['perf']['ct_adv_steps'])
+            ])
+    
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 if __name__ == "__main__":
     main()

@@ -11,8 +11,8 @@ import time
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 
 def test_reactor_trajectory():
     yaml_path = "gri30.yaml"
@@ -45,7 +45,7 @@ def test_reactor_trajectory():
     t_ct = np.array(t_ct)
     T_ct = np.array(T_ct)
     
-    # --- Jantera ---
+    # --- Canterax ---
     sol_ct.TPX = T0, P, X0
     Y0 = jnp.array(sol_ct.Y)
     
@@ -58,14 +58,14 @@ def test_reactor_trajectory():
     
     start_sim = time.time()
     res = net.advance(T0, P, Y0, t_end)
-    print(f"Jantera simulation took {time.time() - start_sim:.2f}s")
+    print(f"Canterax simulation took {time.time() - start_sim:.2f}s")
     
     # Extract results
     t_jan = res.ts
     T_jan = res.ys[:, 0]
     
     # --- Compare ---
-    # Interpolate Jantera onto Cantera time grid for error calculation
+    # Interpolate Canterax onto Cantera time grid for error calculation
     T_jan_interp = np.interp(t_ct, t_jan, T_jan)
     max_dT = np.max(np.abs(T_jan_interp - T_ct))
     
@@ -75,7 +75,7 @@ def test_reactor_trajectory():
     os.makedirs("tests/outputs", exist_ok=True)
     plt.figure(figsize=(10, 6))
     plt.plot(t_ct * 1e3, T_ct, 'b-', label='Cantera', linewidth=2)
-    plt.plot(t_jan * 1e3, T_jan, 'r--', label='Jantera', linewidth=2)
+    plt.plot(t_jan * 1e3, T_jan, 'r--', label='Canterax', linewidth=2)
     plt.title("Reactor Temperature Trajectory (CH4/Air, 1200K, 1 atm)")
     plt.xlabel("Time [ms]")
     plt.ylabel("Temperature [K]")

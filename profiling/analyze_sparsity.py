@@ -7,8 +7,8 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.reactor import reactor_rhs
 
 def analyze_sparsity():
     # Use built-in gri30 or local jp10

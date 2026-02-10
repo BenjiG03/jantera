@@ -1,5 +1,5 @@
 """
-Profile Jantera reactor performance - GRI-30 only (fast).
+Profile Canterax reactor performance - GRI-30 only (fast).
 """
 import os
 import sys
@@ -12,8 +12,8 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 from diffrax import Kvaerno5, Tsit5, SaveAt
 
 
@@ -86,10 +86,10 @@ def profile_gri30():
     print("SUMMARY: GRI-30 @ 1500K, t=100μs")
     print("=" * 60)
     print(f"  JIT compile time:    {jit_time:.1f} s")
-    print(f"  Jantera (warm):      {avg_time*1e3:.1f} ms")
+    print(f"  Canterax (warm):      {avg_time*1e3:.1f} ms")
     print(f"  Cantera:             {ct_avg*1e3:.2f} ms")
     print(f"  Speedup (warm):      {ct_avg/avg_time:.2f}x" if avg_time < ct_avg else f"  Slowdown (warm):     {avg_time/ct_avg:.2f}x")
-    print(f"  T_final (Jantera):   {T_jt:.2f} K")
+    print(f"  T_final (Canterax):   {T_jt:.2f} K")
     print(f"  T_final (Cantera):   {T_ct:.2f} K")
     print(f"  ΔT:                  {abs(T_jt - T_ct):.4f} K")
 

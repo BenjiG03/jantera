@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.solution import Solution
+from canterax.solution import Solution
 
 def test_equilibrium():
     yaml_path = "gri30.yaml"
@@ -28,7 +28,7 @@ def test_equilibrium():
     sol_can.equilibrate('TP')
     Y_can = sol_can.Y
     
-    # Jantera
+    # Canterax
     sol_jan.set_TPX(T, P, X0)
     sol_jan.equilibrate('TP')
     Y_jan = sol_jan.Y
@@ -58,7 +58,7 @@ def test_equilibrium():
     os.makedirs("tests/outputs", exist_ok=True)
     plt.figure(figsize=(10, 6))
     plt.bar(np.arange(sol_jan.n_species), Y_can_comb, alpha=0.5, label='Cantera')
-    plt.bar(np.arange(sol_jan.n_species), Y_jan_comb, alpha=0.5, label='Jantera')
+    plt.bar(np.arange(sol_jan.n_species), Y_jan_comb, alpha=0.5, label='Canterax')
     plt.title(f"Equilibrium Composition at {T}K")
     plt.xlabel("Species Index")
     plt.ylabel("Mass Fraction")

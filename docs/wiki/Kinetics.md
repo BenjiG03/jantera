@@ -22,4 +22,4 @@ $$ ROP = k \cdot \exp \left( \sum_{i} \nu_i \ln([\text{Conc}]_i) \right) $$
 This avoids complex chains of power/product rules during backpropagation, resulting in a **~35% speedup** for Jacobian evaluation.
 
 ### Source Code
-- [src/jantera/kinetics.py](../../src/jantera/kinetics.py)
+- [src/canterax/kinetics.py](../../src/canterax/kinetics.py)

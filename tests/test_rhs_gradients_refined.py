@@ -1,5 +1,5 @@
 """
-Final RHS gradient comparison between Jantera AD and Cantera FD.
+Final RHS gradient comparison between Canterax AD and Cantera FD.
 Isolates the factor of 2 discrepancy by checking concentration gradients.
 """
 import os
@@ -14,10 +14,10 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import reactor_rhs
-from jantera.kinetics import compute_wdot
-from jantera.thermo import compute_mixture_props
+from canterax.loader import load_mechanism
+from canterax.reactor import reactor_rhs
+from canterax.kinetics import compute_wdot
+from canterax.thermo import compute_mixture_props
 
 def compare_rhs_gradients_simplified():
     yaml_path = "gri30.yaml"
@@ -42,7 +42,7 @@ def compare_rhs_gradients_simplified():
     ct_dTdt0 = -(wdot_ct @ h_ct) / (sol_ct.density * sol_ct.cp_mass)
     
     print(f"Base Values at t=0:")
-    print(f"  Jantera dTdt: {jt_dTdt0:.6e}")
+    print(f"  Canterax dTdt: {jt_dTdt0:.6e}")
     print(f"  Cantera dTdt: {ct_dTdt0:.6e}")
     print(f"  Ratio: {jt_dTdt0/ct_dTdt0:.6f}")
 
@@ -51,7 +51,7 @@ def compare_rhs_gradients_simplified():
         _, _, rho = compute_mixture_props(T0, P0, Y, mech)
         return rho * Y[0] / mech.mol_weights[0]
     
-    print("\nCalculating Jantera AD gradients (conc[0])...")
+    print("\nCalculating Canterax AD gradients (conc[0])...")
     grad_jt_conc = jax.grad(get_conc0)(jnp.array(Y0_fixed))
     grad_jt_conc_eff = grad_jt_conc - grad_jt_conc[n2_idx]
     
@@ -87,7 +87,7 @@ def compare_rhs_gradients_simplified():
         state = jnp.concatenate([jnp.array([T0]), Y])
         return reactor_rhs(0.0, state, (P0, mech))[0]
     
-    print("\nCalculating Jantera AD gradients (dTdt)...")
+    print("\nCalculating Canterax AD gradients (dTdt)...")
     grad_jt_dTdt = jax.grad(get_dTdt)(jnp.array(Y0_fixed))
     grad_jt_dTdt_eff = grad_jt_dTdt - grad_jt_dTdt[n2_idx]
     
@@ -126,7 +126,7 @@ def compare_rhs_gradients_simplified():
         val_jt = float(grad_jt_dTdt_eff[i])
         val_ct = grad_ct_dTdt[i]
         table_rows.append([sp_name, f"{val_jt:+.4e}", f"{val_ct:+.4e}", f"{val_jt/val_ct:.4f}x"])
-    print(tabulate(table_rows, headers=["Species", "Jantera (AD)", "Cantera (FD)", "Ratio"], tablefmt="grid"))
+    print(tabulate(table_rows, headers=["Species", "Canterax (AD)", "Cantera (FD)", "Ratio"], tablefmt="grid"))
 
 if __name__ == "__main__":
     compare_rhs_gradients_simplified()

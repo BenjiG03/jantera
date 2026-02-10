@@ -26,7 +26,7 @@ A custom JAX implementation of the CVODE algorithm:
 ## Usage
 
 ```python
-from jantera import ReactorNet
+from canterax import ReactorNet
 
 net = ReactorNet(mech)
 # Advance reactor state from t=0 to t_end
@@ -34,4 +34,4 @@ sol = net.advance(T0, P, Y0, t_end)
 ```
 
 ### Source Code
-- [src/jantera/reactor.py](../../src/jantera/reactor.py)
+- [src/canterax/reactor.py](../../src/canterax/reactor.py)

@@ -11,9 +11,9 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_kf, compute_Kc
-from jantera.thermo import compute_mixture_props
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_kf, compute_Kc
+from canterax.thermo import compute_mixture_props
 
 
 def debug_units():
@@ -30,7 +30,7 @@ def debug_units():
     sol_ct.TPX = T0, P0, X0
     Y0 = jnp.array(sol_ct.Y)
     
-    # Jantera concentrations
+    # Canterax concentrations
     cp_mass, h_mass, rho = compute_mixture_props(T0, P0, Y0, mech)
     Y_eff = jnp.maximum(Y0, 1e-20)
     conc_jt = float(rho) * np.array(Y_eff) / np.array(mech.mol_weights)
@@ -39,7 +39,7 @@ def debug_units():
     conc_ct = sol_ct.concentrations  # mol/m^3
     
     print(f"\n--- Concentrations (first 10 species) ---")
-    print(f"{'Species':12s} {'Jantera':>12s} {'Cantera':>12s} {'Ratio':>10s}")
+    print(f"{'Species':12s} {'Canterax':>12s} {'Cantera':>12s} {'Ratio':>10s}")
     for i in range(10):
         ratio = conc_jt[i] / (conc_ct[i] + 1e-30) if conc_ct[i] > 1e-30 else 0
         print(f"{sol_ct.species_name(i):12s} {conc_jt[i]:12.4e} {conc_ct[i]:12.4e} {ratio:10.4f}")
@@ -57,12 +57,12 @@ def debug_units():
     # Cantera uses mol/m^3, which we should match
     # Let's check density
     print(f"\n--- Density ---")
-    print(f"  Jantera: {float(rho):.6f} kg/m^3")
+    print(f"  Canterax: {float(rho):.6f} kg/m^3")
     print(f"  Cantera: {sol_ct.density:.6f} kg/m^3")
     
     # Check forward rate constants for first few reactions
     print(f"\n--- Forward Rate Constants (kf) ---")
-    print(f"(Cantera in kmol, Jantera should be in mol)")
+    print(f"(Cantera in kmol, Canterax should be in mol)")
     kf_jt = np.array(compute_kf(T0, jnp.array(conc_jt), mech))
     kf_ct = sol_ct.forward_rate_constants  # Cantera units: depends on reaction order
     

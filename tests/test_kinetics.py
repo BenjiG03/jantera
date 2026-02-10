@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_wdot
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_wdot
 
 def test_kinetics():
     yaml_path = "gri30.yaml"
@@ -34,29 +34,29 @@ def test_kinetics():
         kf_cantera_raw = sol.forward_rate_constants
         kc_cantera_raw = sol.equilibrium_constants
         
-        # Jantera (kmol-based)
+        # Canterax (kmol-based)
         Y = jnp.array(sol.Y)
         conc = jnp.array(sol.concentrations)
         
-        from jantera.kinetics import compute_kf, compute_Kc
-        kf_jantera = compute_kf(T, conc, mech)
-        kc_jantera = compute_Kc(T, mech)
+        from canterax.kinetics import compute_kf, compute_Kc
+        kf_canterax = compute_kf(T, conc, mech)
+        kc_canterax = compute_Kc(T, mech)
         
         print(f"\n--- Debug T={T}K ---")
         for j in range(3):
             rxn = sol.reaction(j)
             print(f"Rxn {j}: {rxn}")
-            print(f"  kf: Cantera={kf_cantera_raw[j]:.3e}, Jantera={kf_jantera[j]:.3e}")
-            print(f"  Kc: Cantera={kc_cantera_raw[j]:.3e}, Jantera={kc_jantera[j]:.3e}")
+            print(f"  kf: Cantera={kf_cantera_raw[j]:.3e}, Canterax={kf_canterax[j]:.3e}")
+            print(f"  Kc: Cantera={kc_cantera_raw[j]:.3e}, Canterax={kc_canterax[j]:.3e}")
         
-        wdot_jantera, _, _, _ = compute_wdot(T, P, Y, mech)
-        wdot_jantera = np.array(wdot_jantera)
+        wdot_canterax, _, _, _ = compute_wdot(T, P, Y, mech)
+        wdot_canterax = np.array(wdot_canterax)
         
         # Compare
         # Use abs error normalized by max rate if rate is large,
         # otherwise absolute error.
         max_rate = np.max(np.abs(wdot_cantera))
-        abs_err = np.abs(wdot_jantera - wdot_cantera)
+        abs_err = np.abs(wdot_canterax - wdot_cantera)
         rel_err = abs_err / (max_rate + 1e-20)
         
         max_rel_err = np.max(rel_err)
@@ -67,7 +67,7 @@ def test_kinetics():
         # Plotting for this T
         plt.figure(figsize=(10, 6))
         plt.bar(np.arange(mech.n_species), wdot_cantera, alpha=0.5, label='Cantera')
-        plt.bar(np.arange(mech.n_species), wdot_jantera, alpha=0.5, label='Jantera')
+        plt.bar(np.arange(mech.n_species), wdot_canterax, alpha=0.5, label='Canterax')
         plt.title(f"Net Production Rates at {T}K")
         plt.xlabel("Species Index")
         plt.ylabel("wdot [kmol/m3/s]")

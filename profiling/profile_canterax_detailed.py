@@ -13,10 +13,10 @@ import io
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.solution import Solution
-from jantera.reactor import ReactorNet, reactor_rhs
-from jantera.equilibrate import equilibrate
+from canterax.loader import load_mechanism
+from canterax.solution import Solution
+from canterax.reactor import ReactorNet, reactor_rhs
+from canterax.equilibrate import equilibrate
 
 def profile_function(func, *args, **kwargs):
     """Run cProfile on a function."""

@@ -7,8 +7,8 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 
 def test_bdf_gri30():
     jax.config.update("jax_enable_x64", True)
@@ -27,7 +27,7 @@ def test_bdf_gri30():
     
     t_end = 1e-3
     
-    print("Running Jantera BDF...")
+    print("Running Canterax BDF...")
     t0 = time.perf_counter()
     res_bdf = net.advance(T0, P0, y0, t_end, solver="bdf", rtol=1e-8, atol=1e-12)
     # Block until ready
@@ -38,7 +38,7 @@ def test_bdf_gri30():
     print(f"BDF Steps: {res_bdf['stats']['num_steps']}")
     print(f"Final T: {res_bdf['ys'][-1, 0]:.2f} K")
     
-    print("\nRunning Jantera Kvaerno5 (Reference)...")
+    print("\nRunning Canterax Kvaerno5 (Reference)...")
     t0 = time.perf_counter()
     res_ref = net.advance(T0, P0, y0, t_end, rtol=1e-8, atol=1e-12)
     jax.block_until_ready(res_ref.ys)

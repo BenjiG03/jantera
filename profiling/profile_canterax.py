@@ -8,10 +8,10 @@ import numpy as np
 # Add src to pythonpath
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_kf, compute_Kc, compute_wdot
-from jantera.thermo import compute_mixture_props
-from jantera.reactor import reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_kf, compute_Kc, compute_wdot
+from canterax.thermo import compute_mixture_props
+from canterax.reactor import reactor_rhs
 
 def benchmark(func, args, n_runs=1000):
     # Warm up / JIT

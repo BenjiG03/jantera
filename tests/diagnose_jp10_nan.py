@@ -13,8 +13,8 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet, reactor_rhs
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet, reactor_rhs
 import diffrax
 
 def diagnose_jp10():

@@ -11,8 +11,8 @@ import cantera as ct
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.kinetics import compute_kf, compute_Kc
+from canterax.loader import load_mechanism
+from canterax.kinetics import compute_kf, compute_Kc
 
 
 def compare_all_reactions():
@@ -28,13 +28,13 @@ def compare_all_reactions():
     sol_ct = ct.Solution(yaml_path)
     sol_ct.TPX = T0, P0, X0
     
-    # Jantera ROP
+    # Canterax ROP
     conc = jnp.array(sol_ct.concentrations)
     kf = np.array(compute_kf(T0, conc, mech))
     pkc = np.array(compute_Kc(T0, mech))
     kr = kf / pkc
     
-    # Compute ROP manually in Jantera style to inspect each step
+    # Compute ROP manually in Canterax style to inspect each step
     rop_f_jt = []
     rop_r_jt = []
     

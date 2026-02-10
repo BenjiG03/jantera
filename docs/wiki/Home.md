@@ -1,14 +1,22 @@
-# Jantera Wiki
+# Canterax Wiki
 
-Welcome to the Jantera documentation! This wiki provides detailed explanations of the codebase architecture, module functionality, and validation methodology.
+Welcome to the **Canterax** documentation! This wiki provides a deep dive into the architecture, mathematical formulations, and validation of the library.
 
-## Table of Contents
+Canterax is a JAX-powered chemical kinetics library designed for **Automatic Differentiation**, **GPU acceleration**, and **batch reactor simulations**.
 
-1. [Home](Home.md) - Overview and getting started
-2. [Architecture](Architecture.md) - System design and key principles
-3. [Modules](Modules.md) - Detailed module documentation
-4. [Thermodynamics](Thermodynamics.md) - NASA-7 polynomial implementation
-5. [Kinetics](Kinetics.md) - Reaction rate calculations
-6. [Reactor](Reactor.md) - ODE integration and reactor models
-7. [Equilibrium](Equilibrium.md) - Gibbs minimization solver
-8. [Validation](Validation.md) - Comparison against Cantera
+## 📚 Documentation Sections
+
+| Section | Description |
+| :--- | :--- |
+| **[Architecture](Architecture)** | System design, static data structures, and the "dense-sparse" philosophy. |
+| **[Validation](Validation)** | Parity plots and performance benchmarks against Cantera 3.2.0. |
+| **[Modules](Modules)** | Overview of the core Python modules and their responsibilities. |
+| **[Thermodynamics](Thermodynamics)** | Implementation of NASA-7 polynomial fits and mixture properties. |
+| **[Kinetics](Kinetics)** | High-performance Arrhenius, Three-Body, and Falloff reaction rates. |
+| **[Reactor](Reactor)** | Stiff ODE integration with Diffrax and reactor network models. |
+| **[Equilibrium](Equilibrium)** | Gibbs minimization with element-potential selection. |
+
+---
+
+> [!TIP]
+> To get started with the code, check out the **[Quickstart](https://github.com/BenjiG03/canterax#quickstart)** in the main README.

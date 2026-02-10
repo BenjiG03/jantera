@@ -1,5 +1,5 @@
 """
-Verify Jantera JAX gradients (AD) against Cantera Finite Differences (FD).
+Verify Canterax JAX gradients (AD) against Cantera Finite Differences (FD).
 """
 import os
 import sys
@@ -15,8 +15,8 @@ jax.config.update("jax_enable_x64", True)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from jantera.loader import load_mechanism
-from jantera.reactor import ReactorNet
+from canterax.loader import load_mechanism
+from canterax.reactor import ReactorNet
 
 def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_species_fd=None):
     print(f"\n{'='*20} Validating Gradients: {name} {'='*20}")
@@ -44,8 +44,8 @@ def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_sp
         res = net.advance(T0, P0, y_norm, t_grad, rtol=1e-10, atol=1e-14, solver=diffrax.Tsit5())
         return res.ys[-1, 0]
     
-    # 2. Jantera JAX AD Gradient
-    print(f"  Calculating Jantera AD gradients...", end="", flush=True)
+    # 2. Canterax JAX AD Gradient
+    print(f"  Calculating Canterax AD gradients...", end="", flush=True)
     start = time.perf_counter()
     grad_jt = jax.grad(get_final_T)(Y0)
     jax.block_until_ready(grad_jt)
@@ -58,7 +58,7 @@ def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_sp
         species_to_test = range(n_sp)
     else:
         # Sensitivities are usually highest for some species, pick a subset for speed if mechanism is large
-        # We'll use the ones Jantera says are high
+        # We'll use the ones Canterax says are high
         top_indices = np.argsort(np.abs(grad_jt))[-max_species_fd:][::-1]
         species_to_test = sorted(top_indices)
         
@@ -91,7 +91,7 @@ def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_sp
         
         grad_ct_fd[i] = (T_plus_ct - T_minus_ct) / (2 * eps)
         
-        # 2. Jantera FD (as a sanity check for AD)
+        # 2. Canterax FD (as a sanity check for AD)
         T_plus_jt = float(get_final_T(jnp.array(Y_plus)))
         T_minus_jt = float(get_final_T(jnp.array(Y_minus)))
         grad_jt_fd[i] = (T_plus_jt - T_minus_jt) / (2 * eps)
@@ -116,7 +116,7 @@ def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_sp
         table_rows.append([sp_name, f"{val_jt:+.4e}", f"{val_ct:+.4e}", f"{abs_diff:.2e}", f"{rel_diff*100:.4f}%"])
     
     print("\nTop 10 species by temperature sensitivity (dT_final / dY_i):")
-    print(tabulate(table_rows, headers=["Species", "Jantera (AD)", "Cantera (FD)", "Abs Diff", "Rel Diff"], tablefmt="grid"))
+    print(tabulate(table_rows, headers=["Species", "Canterax (AD)", "Cantera (FD)", "Abs Diff", "Rel Diff"], tablefmt="grid"))
     
     # Overall statistics for tested species
     test_jt = np.array(grad_jt)[species_to_test]

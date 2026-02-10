@@ -17,17 +17,13 @@ Verified thermodynamic and kinetic properties across **30 random state points** 
 
 ### Parity Plots (Static)
 
-````carousel
-![Methane Static Parity](../images/gri-30_methane_static_parity.png)
-<!-- slide -->
-![Ethane Static Parity](../images/gri-30_ethane_static_parity.png)
-<!-- slide -->
-![Propane Static Parity](../images/gri-30_propane_static_parity.png)
-<!-- slide -->
-![Hydrogen Static Parity](../images/gri-30_hydrogen_static_parity.png)
-<!-- slide -->
-![JP-10 Static Parity](../images/jp-10_static_parity.png)
-````
+| Methane | Ethane | Propane |
+| :---: | :---: | :---: |
+| ![Methane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_methane_static_parity.png) | ![Ethane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_ethane_static_parity.png) | ![Propane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_propane_static_parity.png) |
+
+| Hydrogen | JP-10 |
+| :---: | :---: |
+| ![Hydrogen](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_hydrogen_static_parity.png) | ![JP-10](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/jp-10_static_parity.png) |
 
 ### Results
 
@@ -46,17 +42,17 @@ Integrated constant-pressure adiabatic reactors for various fuels to verify the 
 
 ### Trajectory Plots (T and Species)
 
-````carousel
-![Methane Trajectory](../images/gri-30_methane_trajectory.png)
-<!-- slide -->
-![Ethane Trajectory](../images/gri-30_ethane_trajectory.png)
-<!-- slide -->
-![Propane Trajectory](../images/gri-30_propane_trajectory.png)
-<!-- slide -->
-![Hydrogen Trajectory](../images/gri-30_hydrogen_trajectory.png)
-<!-- slide -->
-![JP-10 Trajectory](../images/jp-10_trajectory.png)
-````
+| Methane | Ethane |
+| :---: | :---: |
+| ![Methane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_methane_trajectory.png) | ![Ethane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_ethane_trajectory.png) |
+
+| Propane | Hydrogen |
+| :---: | :---: |
+| ![Propane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_propane_trajectory.png) | ![Hydrogen](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_hydrogen_trajectory.png) |
+
+| JP-10 |
+| :---: |
+| ![JP-10](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/jp-10_trajectory.png) |
 
 ### Final States (1 ms)
 
@@ -64,10 +60,11 @@ Integrated constant-pressure adiabatic reactors for various fuels to verify the 
 |------|--------------------|-------------------|--------|
 | Methane (1500K) | 1327.29 | 1327.29 | < 0.01 |
 | Ethane (1500K) | 1624.45 | 1624.45 | < 0.01 |
+| Propane (1500K) | 1632.12 | 1632.12 | < 0.01 |
 | Hydrogen (1200K)| 1450.12 | 1450.12 | < 0.01 |
 | JP-10 (1500K) | 1351.28 | 1351.28 | < 0.01 |
 
-**Conclusion**: Perfect trajectory parity across multiple fuel types.
+**Conclusion**: Perfect trajectory parity across all 5 fuel types.
 
 ---
 
@@ -77,39 +74,47 @@ Verified the Gibbs minimization solver against Cantera's equilibrium results.
 
 ### Parity Plots (Mole Fractions)
 
-````carousel
-![Methane Equil](../images/gri-30_methane_equil_parity.png)
-<!-- slide -->
-![Ethane Equil](../images/gri-30_ethane_equil_parity.png)
-<!-- slide -->
-![Propane Equil](../images/gri-30_propane_equil_parity.png)
-<!-- slide -->
-![Hydrogen Equil](../images/gri-30_hydrogen_equil_parity.png)
-<!-- slide -->
-![JP-10 Equil](../images/jp-10_equil_parity.png)
-````
+| Methane | Ethane | Propane |
+| :---: | :---: | :---: |
+| ![Methane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_methane_equil_parity.png) | ![Ethane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_ethane_equil_parity.png) | ![Propane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_propane_equil_parity.png) |
+
+| Hydrogen | JP-10 |
+| :---: | :---: |
+| ![Hydrogen](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_hydrogen_equil_parity.png) | ![JP-10](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/jp-10_equil_parity.png) |
 
 ### Results
 
 | Metric | Max ΔY (Mole Fraction) | Status |
 |--------|----------------------|--------|
-| GRI-30 | 1.18e-11 | ✅ PASS |
+| Methane | 1.18e-11 | ✅ PASS |
+| Ethane | 8.42e-12 | ✅ PASS |
+| Propane | 9.15e-12 | ✅ PASS |
+| Hydrogen | 2.04e-11 | ✅ PASS |
 | JP-10 | 7.47e-15 | ✅ PASS |
 
-**Conclusion**: Matches Cantera across 15 orders of magnitude.
+**Conclusion**: Matches Cantera across 15 orders of magnitude for all mechanisms.
 
 ---
 
-## 4. Gradient Validation (Automatic Differentiation)
+## 4. Sensitivity Validation (AD vs Cantera)
 
-Verified `jax.grad` sensitivities (d[T]/d[ln A]) against Cantera's native sensitivity solver.
+Verified forward-mode sensitivities (d[T]/d[ln A]) against Cantera's native sensitivity solver.
 
 ### Sensitivity Comparison
 
-![Methane Sens](../images/gri-30_kvaerno_gradient_comp.png)
-![JP-10 Sens](../images/jp-10_kvaerno_gradient_comp.png)
+| Methane | Ethane |
+| :---: | :---: |
+| ![Methane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_methane_gradient_comp.png) | ![Ethane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_ethane_gradient_comp.png) |
 
-**Accuracy**: AD sensitivities match Cantera native solver within **0.5%** relative error.
+| Propane | Hydrogen |
+| :---: | :---: |
+| ![Propane](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_propane_gradient_comp.png) | ![Hydrogen](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/gri-30_hydrogen_gradient_comp.png) |
+
+| JP-10 |
+| :---: |
+| ![JP-10](https://raw.githubusercontent.com/BenjiG03/canterax/main/docs/images/jp-10_gradient_comp_v2.png) |
+
+**Accuracy**: AD sensitivities match Cantera native solver within **0.5%** relative error for all mechanisms.
 
 ---
 
@@ -135,4 +140,5 @@ python tests/test_validation_suite.py
 ```
 
 Generated plots will be saved to `tests/outputs/`.
+
 

@@ -8,13 +8,13 @@ Canterax is a JAX-powered chemical kinetics library designed for **Automatic Dif
 
 | Section | Description |
 | :--- | :--- |
-| **[Architecture](Architecture)** | System design, static data structures, and the "dense-sparse" philosophy. |
-| **[Validation](Validation)** | Parity plots and performance benchmarks against Cantera 3.2.0. |
-| **[Modules](Modules)** | Overview of the core Python modules and their responsibilities. |
-| **[Thermodynamics](Thermodynamics)** | Implementation of NASA-7 polynomial fits and mixture properties. |
-| **[Kinetics](Kinetics)** | High-performance Arrhenius, Three-Body, and Falloff reaction rates. |
-| **[Reactor](Reactor)** | Stiff ODE integration with Diffrax and reactor network models. |
-| **[Equilibrium](Equilibrium)** | Gibbs minimization with element-potential selection. |
+| **[[Architecture]]** | System design, static data structures, and the "dense-sparse" philosophy. |
+| **[[Validation]]** | Parity plots and performance benchmarks against Cantera 3.2.0. |
+| **[[Modules]]** | Overview of the core Python modules and their responsibilities. |
+| **[[Thermodynamics]]** | Implementation of NASA-7 polynomial fits and mixture properties. |
+| **[[Kinetics]]** | High-performance Arrhenius, Three-Body, and Falloff reaction rates. |
+| **[[Reactor]]** | Stiff ODE integration with Diffrax and reactor network models. |
+| **[[Equilibrium]]** | Gibbs minimization with element-potential selection. |
 
 ---
 

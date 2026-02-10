@@ -1,16 +1,16 @@
 ### 🔍 Navigation
 
-* **[Home](Home)**
-* **[Architecture](Architecture)**
-* **[Validation](Validation)**
-* **[Modules](Modules)**
+* **[[Home]]**
+* **[[Architecture]]**
+* **[[Validation]]**
+* **[[Modules]]**
 
 ### 🧪 Core Physics
 
-* **[Thermodynamics](Thermodynamics)**
-* **[Kinetics](Kinetics)**
-* **[Reactor](Reactor)**
-* **[Equilibrium](Equilibrium)**
+* **[[Thermodynamics]]**
+* **[[Kinetics]]**
+* **[[Reactor]]**
+* **[[Equilibrium]]**
 
 ### 🚀 Resources
 

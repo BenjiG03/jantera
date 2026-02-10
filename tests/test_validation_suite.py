@@ -229,9 +229,11 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
             grad_mech = eqx.filter_grad(grad_fun)(mech_jt, sol_jt.Y)
             jt_sens_time_warm = time.time() - t0
             
-            grad_jt_norm = np.array(grad_mech.A * mech_jt.A) # This is dT/d(ln A)
-            _, jt_sens_steps = get_final_T(mech_jt, sol_jt.Y)
-            print(f" Done ({jt_sens_time_jit:.2f}s JIT, {jt_sens_time_warm:.4f}s Warm, {jt_sens_steps} steps)", flush=True)
+            # Normalize Canterax sensitivity to match Cantera: (A/T) * dT/dA
+            # Current calc: grad_mech.A * mech_jt.A = A * dT/dA
+            # So we need to divide by T_final.
+            T_final_jt, _ = get_final_T(mech_jt, sol_jt.Y)
+            grad_jt_norm = np.array(grad_mech.A * mech_jt.A) / T_final_jt
             
             print(f"  Computing Cantera native sensitivities...", end="", flush=True)
             sol_ct.TPX = T0, P0, X0_str
@@ -253,18 +255,25 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
             
             grad_ct_norm = []
             for i in range(sol_ct.n_reactions):
+                # Cantera returns (ki/T) * dT/dki
                 grad_ct_norm.append(net_ct.sensitivity('temperature', i))
             grad_ct_norm = np.array(grad_ct_norm)
             
-            plt.figure(figsize=(12, 6))
+            # Print top sensitivities for debugging
             top_sens_idx = np.argsort(np.abs(grad_ct_norm))[-10:][::-1]
+            print(f"  Top 5 Sensitivities for {name}:")
+            for i in top_sens_idx[:5]:
+                print(f"    R{i}: CT={grad_ct_norm[i]:.2e}, JT={grad_jt_norm[i]:.2e}, Ratio={grad_jt_norm[i]/grad_ct_norm[i] if abs(grad_ct_norm[i])>1e-12 else 0:.2f}")
+
+            plt.figure(figsize=(12, 6))
             labels = [f"R{i}: {sol_ct.reaction(i).equation}"[:30] for i in top_sens_idx]
             x = np.arange(len(labels))
             width = 0.35
-            plt.bar(x - width/2, grad_ct_norm[top_sens_idx], width, label='Cantera (Native)', color='gray')
-            plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Canterax (AD)', color='cyan')
+            # Plot Side-by-Side
+            plt.bar(x - width/2, grad_ct_norm[top_sens_idx], width, label='Cantera (Native)', color='gray', alpha=0.8)
+            plt.bar(x + width/2, grad_jt_norm[top_sens_idx], width, label='Canterax (AD)', color='cyan', alpha=0.8)
             plt.xticks(x, labels, rotation=45, ha='right')
-            plt.ylabel('Normalized Sensitivity d(T) / d(ln A)')
+            plt.ylabel('Normalized Sensitivity (A/T * dT/dA)')
             plt.title(f'{name} Reaction Sensitivity ({solver_name})')
             plt.legend()
             plt.grid(axis='y', alpha=0.3)

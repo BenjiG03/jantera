@@ -106,10 +106,12 @@ def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
     # 3. Forward and reverse rate constants
     kf = compute_kf(T, conc, mech, use_experimental_sparse)
     kc = compute_Kc(T, mech)
-    kr = kf / (kc + 1e-100)
+    # Avoid div by zero for reverse rate if kc is tiny
+    kr = kf / jnp.maximum(kc, 1e-100)
     
     # 4. Rates of progress [log-space for efficient AD]
-    safe_conc = jnp.maximum(conc, 1e-30)
+    # Small floor to avoid log(0) while maintaining precision
+    safe_conc = jnp.maximum(conc, 1e-100)
     log_conc = jnp.log(safe_conc)
     
     # Pad log_conc with 0 for dummy indices (log(1.0) = 0)
